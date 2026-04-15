@@ -60,12 +60,57 @@ public struct User: Sendable, Equatable, Hashable, Codable {
     }
 }
 
+// MARK: - UserRepositoryProtocol
+
+/// Protocol defining the contract for user repository operations.
+///
+/// This protocol enables dependency injection and testing of services that depend
+/// on user persistence (e.g., ``AuthenticationService`` in the RBAC module) without
+/// requiring a live MySQL connection. The concrete ``UserRepository`` class conforms
+/// to this protocol for production use, while test code provides lightweight mock
+/// implementations.
+///
+/// ## Methods
+/// - ``findByUsername(_:)`` — Primary authentication lookup (used by login flow)
+/// - ``create(_:)`` — User creation with duplicate detection
+/// - ``findAll(page:pageSize:)`` — Paginated user listing (Rule 7 compliant)
+///
+/// ## Thread Safety
+/// All conforming types must be `Sendable` for Swift 6 strict concurrency compliance
+/// (Gate 2). The protocol inherits from `Sendable` to enforce this at compile time.
+public protocol UserRepositoryProtocol: Sendable {
+
+    /// Finds a user by username — the primary authentication lookup method.
+    ///
+    /// - Parameter username: The username to search for.
+    /// - Returns: The matching ``User`` including the password hash, or `nil`
+    ///            if no user exists with that username.
+    func findByUsername(_ username: String) async throws -> User?
+
+    /// Creates a new user record.
+    ///
+    /// - Parameter entity: The user to create (the `id` field may be ignored
+    ///                     if the backing store auto-generates IDs).
+    /// - Returns: The created user with the store-assigned ID populated.
+    /// - Throws: ``AppError/duplicateUser`` if the username already exists.
+    func create(_ entity: User) async throws -> User
+
+    /// Retrieves a paginated list of all users.
+    ///
+    /// - Parameters:
+    ///   - page: 1-based page number.
+    ///   - pageSize: Maximum records per page (capped at 1,000 per Rule 7).
+    /// - Returns: Array of users for the requested page, may be empty.
+    func findAll(page: Int, pageSize: Int) async throws -> [User]
+}
+
 // MARK: - UserRepository
 
 /// Repository for the `users` table providing complete CRUD operations,
 /// username-based lookup for authentication, and duplicate username rejection.
 ///
-/// Conforms to `RepositoryProtocol` with `User` as Entity and `UInt64` as EntityID.
+/// Conforms to `RepositoryProtocol` with `User` as Entity and `UInt64` as EntityID,
+/// and to ``UserRepositoryProtocol`` for protocol-based dependency injection.
 ///
 /// ## Thread Safety (Gate 2 — Swift 6 Strict Concurrency)
 /// All stored properties are immutable (`let`). `ConnectionPool` is an actor
@@ -84,7 +129,7 @@ public struct User: Sendable, Equatable, Hashable, Codable {
 /// `UNIQUE` constraint on `username`. The `entitlements` table references `users`
 /// via foreign key; deleting a user may fail with an FK constraint error if
 /// entitlements still reference the user.
-public final class UserRepository: RepositoryProtocol, Sendable {
+public final class UserRepository: RepositoryProtocol, UserRepositoryProtocol, Sendable {
 
     public typealias Entity = User
     public typealias EntityID = UInt64

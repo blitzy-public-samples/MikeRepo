@@ -69,7 +69,7 @@ import Persistence
 ///
 /// This class is declared `final` with only immutable (`let`) stored properties that
 /// are themselves `Sendable`:
-/// - `userRepository: UserRepository` — a `Sendable` final class
+/// - `userRepository: any UserRepositoryProtocol` — a `Sendable` existential
 /// - `passwordHasher: PasswordHasher` — a `Sendable` struct
 ///
 /// No `@unchecked Sendable` annotations or warning suppressions are used. All methods
@@ -102,7 +102,7 @@ public final class AuthenticationService: Sendable {
 
     // MARK: - Properties
 
-    /// MySQL persistence layer for user records.
+    /// Persistence layer for user records, injected via protocol for testability.
     ///
     /// Provides `findByUsername(_:)` for authentication lookup and `create(_:)` for
     /// new user persistence. Handles MySQL duplicate key errors (code 1062) and
@@ -110,7 +110,10 @@ public final class AuthenticationService: Sendable {
     ///
     /// Returns `Persistence.User` instances which are converted to `RBAC.User`
     /// before being exposed through the public API.
-    private let userRepository: UserRepository
+    ///
+    /// Accepts any type conforming to ``UserRepositoryProtocol`` — the concrete
+    /// ``UserRepository`` for production use, or a mock for unit testing.
+    private let userRepository: any UserRepositoryProtocol
 
     /// Bcrypt password hashing and verification service.
     ///
@@ -127,9 +130,11 @@ public final class AuthenticationService: Sendable {
     /// startup. No global state or singletons are used.
     ///
     /// - Parameters:
-    ///   - userRepository: The repository for user persistence operations.
+    ///   - userRepository: Any type conforming to ``UserRepositoryProtocol`` for
+    ///     user persistence operations. Use ``UserRepository`` for production and
+    ///     a mock implementation for testing.
     ///   - passwordHasher: The bcrypt hashing service for password operations.
-    public init(userRepository: UserRepository, passwordHasher: PasswordHasher) {
+    public init(userRepository: any UserRepositoryProtocol, passwordHasher: PasswordHasher) {
         self.userRepository = userRepository
         self.passwordHasher = passwordHasher
     }

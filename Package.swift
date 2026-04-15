@@ -152,6 +152,7 @@ let package = Package(
                 "ValuationEngine",
                 "ReferenceDataService",
                 "RBAC",
+                "Persistence",
                 "Shared",
             ],
             path: "Tests/UnitTests"
