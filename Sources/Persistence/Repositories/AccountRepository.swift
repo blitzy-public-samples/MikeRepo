@@ -434,6 +434,80 @@ public final class AccountRepository: RepositoryProtocol, Sendable {
         }
     }
 
+    // MARK: - Update Method
+
+    /// Updates an existing account's mutable fields in the database.
+    ///
+    /// Identifies the row by `entity.id` and updates all mutable columns:
+    /// `account_name`, `fund_type`, `account_group_id`, `ownership_details`,
+    /// `valuation_timezone`, `valuation_schedule`, `cached_valuation_amount`,
+    /// `cached_value_date`, and `account_status`. The `created_at` column is
+    /// not modified.
+    ///
+    /// FK constraint on `account_group_id` → `account_groups.id` is enforced
+    /// by the MySQL schema (Rule 10). Updating with an invalid group ID will
+    /// cause a MySQL constraint error.
+    ///
+    /// - Parameter entity: The account with updated values. The `id` must
+    ///   correspond to an existing row in the `accounts` table.
+    /// - Returns: The updated account entity (echoed back with the provided values).
+    /// - Throws: MySQL FK constraint errors if `accountGroupId` is invalid,
+    ///   or database connection errors.
+    public func update(_ entity: Account) async throws -> Account {
+        let entityId = entity.id
+        let name = entity.name
+        let fundType = entity.fundType.rawValue
+        let accountGroupId = entity.accountGroupId
+        let ownershipDetails = entity.ownershipDetails
+        let valuationTimezone = entity.valuationTimezone
+        let valuationSchedule = entity.valuationSchedule
+        let cachedAmount = entity.cachedValuationAmount
+        let cachedDate = entity.cachedValueDate
+        let status = entity.status.rawValue
+        let logger = self.logger
+
+        try await pool.withConnection { db in
+            logger.info("Updating account with id: \(entityId), name: \(name)")
+
+            // Build binding array — handle nullable fields with MySQLData.null
+            let ownershipBind: MySQLData = ownershipDetails.map { MySQLData(string: $0) } ?? .null
+            let scheduleBind: MySQLData = valuationSchedule.map { MySQLData(string: $0) } ?? .null
+            let cachedAmountBind: MySQLData = cachedAmount.map { MySQLData(string: "\($0)") } ?? .null
+            let cachedDateBind: MySQLData
+            if let date = cachedDate {
+                let formatter = ISO8601DateFormatter()
+                formatter.formatOptions = [.withFullDate]
+                cachedDateBind = MySQLData(string: formatter.string(from: date))
+            } else {
+                cachedDateBind = .null
+            }
+
+            _ = try await db.query(
+                """
+                UPDATE accounts SET account_name = ?, fund_type = ?, account_group_id = ?,
+                    ownership_details = ?, valuation_timezone = ?, valuation_schedule = ?,
+                    cached_valuation_amount = ?, cached_value_date = ?, account_status = ?
+                WHERE id = ?
+                """,
+                [
+                    MySQLData(string: name),
+                    MySQLData(string: fundType),
+                    MySQLData(int: Int(accountGroupId)),
+                    ownershipBind,
+                    MySQLData(string: valuationTimezone),
+                    scheduleBind,
+                    cachedAmountBind,
+                    cachedDateBind,
+                    MySQLData(string: status),
+                    MySQLData(int: Int(entityId)),
+                ]
+            ).get()
+
+            logger.info("Updated account with id: \(entityId)")
+        }
+        return entity
+    }
+
     // MARK: - Search Methods (Rule 13 — Performance Critical)
 
     /// Searches accounts with optional multi-criteria filters and pagination.
