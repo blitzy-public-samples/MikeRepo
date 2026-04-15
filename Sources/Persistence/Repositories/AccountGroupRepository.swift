@@ -228,7 +228,7 @@ public final class AccountGroupRepository: RepositoryProtocol, Sendable {
             ).get()
             guard let insertId = idRows.first?.column("insert_id")?.uint64 else {
                 logger.error("Failed to retrieve LAST_INSERT_ID after account group creation for name: \(groupName)")
-                throw AppError.migrationFailed
+                throw AppError.dataAccessFailed("LAST_INSERT_ID returned nil after account group creation for name: \(groupName)")
             }
 
             logger.info("Created account group '\(groupName)' with id: \(insertId)")
@@ -386,13 +386,13 @@ public final class AccountGroupRepository: RepositoryProtocol, Sendable {
     ///
     /// - Parameter row: The MySQL result row containing the expected columns.
     /// - Returns: The mapped `AccountGroup` instance.
-    /// - Throws: `AppError.migrationFailed` if required columns (`id`,
+    /// - Throws: `AppError.dataAccessFailed` if required columns (`id`,
     ///           `group_name`, `created_at`) are missing or cannot be decoded.
     private static func mapRow(_ row: MySQLRow) throws -> AccountGroup {
         guard let id = row.column("id")?.uint64,
               let groupName = row.column("group_name")?.string,
               let createdAt = row.column("created_at")?.date else {
-            throw AppError.migrationFailed
+            throw AppError.dataAccessFailed("Failed to map account group row: missing or invalid columns (id, group_name, created_at)")
         }
         // metadata is nullable JSON — .string returns nil for SQL NULL
         let metadata = row.column("metadata")?.string

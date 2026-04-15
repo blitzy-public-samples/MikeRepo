@@ -116,6 +116,15 @@ public struct Transaction: Sendable, Equatable, Identifiable {
     /// Maps to `transactions.credit_amount` (DECIMAL(20,6) NOT NULL).
     public let creditAmount: Decimal
 
+    // MARK: - Description
+
+    /// Free-text description of the transaction purpose or context.
+    ///
+    /// Maps to `transactions.description` (VARCHAR(500) DEFAULT NULL).
+    /// Optional — may be `nil` when no additional context is needed.
+    /// Useful for audit trail annotation on restatement offsetting entries.
+    public let description: String?
+
     // MARK: - Restatement Support
 
     /// Reference to the original transaction this entry offsets.
@@ -146,6 +155,7 @@ public struct Transaction: Sendable, Equatable, Identifiable {
     ///   - ownershipPercentage: Ownership percentage, or `nil`.
     ///   - debitAmount: Debit component of the double-entry line.
     ///   - creditAmount: Credit component of the double-entry line.
+    ///   - description: Free-text description, or `nil`.
     ///   - restatementRefId: Original transaction FK for offsets, or `nil`.
     ///   - createdAt: Persistence timestamp. Defaults to current date.
     public init(
@@ -157,6 +167,7 @@ public struct Transaction: Sendable, Equatable, Identifiable {
         ownershipPercentage: Decimal? = nil,
         debitAmount: Decimal,
         creditAmount: Decimal,
+        description: String? = nil,
         restatementRefId: UInt64? = nil,
         createdAt: Date = Date()
     ) {
@@ -168,6 +179,7 @@ public struct Transaction: Sendable, Equatable, Identifiable {
         self.ownershipPercentage = ownershipPercentage
         self.debitAmount = debitAmount
         self.creditAmount = creditAmount
+        self.description = description
         self.restatementRefId = restatementRefId
         self.createdAt = createdAt
     }
@@ -239,7 +251,7 @@ public final class TransactionRepository: RepositoryProtocol {
     /// Centralised here to guarantee consistent column ordering across all
     /// query methods and to avoid typos in repeated SQL fragments.
     private static let selectColumns: String =
-        "id, account_id, instrument_id, quantity, asset_type, ownership_pct, debit_amount, credit_amount, restatement_ref_id, created_at"
+        "id, account_id, instrument_id, quantity, asset_type, ownership_pct, debit_amount, credit_amount, description, restatement_ref_id, created_at"
 
     // MARK: - Initializer
 
@@ -345,14 +357,15 @@ public final class TransactionRepository: RepositoryProtocol {
         let ownershipPercentage = entity.ownershipPercentage
         let debitAmount = entity.debitAmount
         let creditAmount = entity.creditAmount
+        let description = entity.description
         let restatementRefId = entity.restatementRefId
 
         return try await pool.withConnection { db in
             let sqlDb = db.sql()
 
             // Build the INSERT query with proper NULL handling for
-            // optional columns: instrument_id, ownership_pct, restatement_ref_id
-            var query: SQLQueryString = "INSERT INTO transactions (account_id, instrument_id, quantity, asset_type, ownership_pct, debit_amount, credit_amount, restatement_ref_id) VALUES ("
+            // optional columns: instrument_id, ownership_pct, description, restatement_ref_id
+            var query: SQLQueryString = "INSERT INTO transactions (account_id, instrument_id, quantity, asset_type, ownership_pct, debit_amount, credit_amount, description, restatement_ref_id) VALUES ("
             query += "\(bind: accountId), "
 
             if let instrId = instrumentId {
@@ -372,6 +385,12 @@ public final class TransactionRepository: RepositoryProtocol {
 
             query += "\(bind: debitAmount), "
             query += "\(bind: creditAmount), "
+
+            if let desc = description {
+                query += "\(bind: desc), "
+            } else {
+                query += "NULL, "
+            }
 
             if let restRefId = restatementRefId {
                 query += "\(bind: restRefId)"
@@ -401,6 +420,7 @@ public final class TransactionRepository: RepositoryProtocol {
                 ownershipPercentage: ownershipPercentage,
                 debitAmount: debitAmount,
                 creditAmount: creditAmount,
+                description: description,
                 restatementRefId: restatementRefId,
                 createdAt: Date()
             )
@@ -477,8 +497,8 @@ public final class TransactionRepository: RepositoryProtocol {
     ///   - offsettingEntry: The new transaction entry with negated amounts.
     ///     Its `restatementRefId` will be overridden to point to the original.
     /// - Returns: The persisted offsetting transaction with auto-generated `id`.
-    /// - Throws: ``AppError/accountNotFound`` if the original transaction does
-    ///   not exist, or database constraint / connection errors.
+    /// - Throws: ``AppError/transactionNotFound`` if the original transaction
+    ///   does not exist, or database constraint / connection errors.
     public func createRestatement(
         originalTransactionId: UInt64,
         offsettingEntry: Transaction
@@ -488,7 +508,7 @@ public final class TransactionRepository: RepositoryProtocol {
             logger.warning(
                 "Restatement failed — original transaction \(originalTransactionId) not found"
             )
-            throw AppError.accountNotFound
+            throw AppError.transactionNotFound
         }
 
         // 2. Build the offsetting entry with the correct restatement reference
@@ -501,6 +521,7 @@ public final class TransactionRepository: RepositoryProtocol {
             ownershipPercentage: offsettingEntry.ownershipPercentage,
             debitAmount: offsettingEntry.debitAmount,
             creditAmount: offsettingEntry.creditAmount,
+            description: offsettingEntry.description,
             restatementRefId: originalTransactionId,
             createdAt: Date()
         )
@@ -575,10 +596,10 @@ public final class TransactionRepository: RepositoryProtocol {
 
     /// Maps a SQL result row to a ``Transaction`` model instance.
     ///
-    /// Decodes all ten columns from the `transactions` table into the
+    /// Decodes all eleven columns from the `transactions` table into the
     /// corresponding Swift properties.  Nullable columns (`instrument_id`,
-    /// `ownership_pct`, `restatement_ref_id`) are decoded as optionals.
-    /// All financial fields use `Decimal` to preserve precision.
+    /// `ownership_pct`, `description`, `restatement_ref_id`) are decoded as
+    /// optionals. All financial fields use `Decimal` to preserve precision.
     ///
     /// - Parameter row: A SQL result row from a `transactions` table query.
     /// - Returns: A fully populated ``Transaction`` instance.
@@ -594,6 +615,7 @@ public final class TransactionRepository: RepositoryProtocol {
             ownershipPercentage: try row.decode(column: "ownership_pct", as: Decimal?.self),
             debitAmount: try row.decode(column: "debit_amount", as: Decimal.self),
             creditAmount: try row.decode(column: "credit_amount", as: Decimal.self),
+            description: try row.decode(column: "description", as: String?.self),
             restatementRefId: try row.decode(column: "restatement_ref_id", as: UInt64?.self),
             createdAt: try row.decode(column: "created_at", as: Date.self)
         )

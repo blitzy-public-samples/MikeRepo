@@ -12,11 +12,11 @@ import Foundation
 /// errors thrown by every business-logic module: AccountManagement, LedgerEngine,
 /// ValuationEngine, RBAC, Persistence, JobScheduler, and ReferenceDataService.
 ///
-/// Conforms to both ``Error`` (for Swift error-handling semantics) and ``Sendable``
-/// (for Swift 6 strict concurrency safety). Because every case is a simple enum value
-/// with no associated storage, `Sendable` conformance is trivially safe — no
-/// `@unchecked Sendable` annotations are required.
-public enum AppError: Error, Sendable {
+/// Conforms to ``Error`` (for Swift error-handling semantics), ``Sendable``
+/// (for Swift 6 strict concurrency safety), and ``Equatable`` (for assertion
+/// ergonomics in tests). All associated values are `Sendable` and `Equatable`
+/// value types, so conformance synthesis is safe with no `@unchecked` annotations.
+public enum AppError: Error, Sendable, Equatable {
 
     // MARK: - Ledger Rules
 
@@ -88,6 +88,17 @@ public enum AppError: Error, Sendable {
     /// Consumers: ``ValuationService``, ``AccountService``.
     case invalidTimezone
 
+    // MARK: - Entity Lookups (Transactions)
+
+    /// Transaction lookup failure.
+    ///
+    /// Thrown when a requested transaction identifier does not correspond to any
+    /// existing record in the database. Used by restatement operations that must
+    /// reference an existing original transaction via foreign key.
+    ///
+    /// Consumers: ``TransactionRepository``, ``LedgerService``.
+    case transactionNotFound
+
     // MARK: - Repository Operations
 
     /// Operation not permitted on this repository.
@@ -102,6 +113,22 @@ public enum AppError: Error, Sendable {
     ///
     /// Consumers: ``RepositoryProtocol`` conformances, ``TransactionRepository``.
     case operationNotPermitted
+
+    // MARK: - Data Access
+
+    /// Generic data-access failure.
+    ///
+    /// Thrown when a database query succeeds at the protocol level but the
+    /// result cannot be mapped to the expected domain model — for example,
+    /// when a required column is missing from a result row, when
+    /// `LAST_INSERT_ID()` returns an unexpected value, or when a type
+    /// conversion fails during row mapping.
+    ///
+    /// The associated `String` carries a human-readable description of
+    /// the failure context for diagnostic logging.
+    ///
+    /// Consumers: All repository classes in the Persistence module.
+    case dataAccessFailed(String)
 
     // MARK: - Persistence Infrastructure
 

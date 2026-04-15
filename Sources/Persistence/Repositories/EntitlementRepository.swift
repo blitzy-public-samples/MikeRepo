@@ -289,7 +289,7 @@ public final class EntitlementRepository: RepositoryProtocol, Sendable {
             ).get()
             guard let insertId = idRows.first?.column("insert_id")?.uint64 else {
                 logger.error("Failed to retrieve LAST_INSERT_ID after entitlement creation for userId: \(userId), accountGroupId: \(accountGroupId)")
-                throw AppError.migrationFailed
+                throw AppError.dataAccessFailed("LAST_INSERT_ID returned nil after entitlement creation for userId: \(userId), accountGroupId: \(accountGroupId)")
             }
 
             logger.info("Created entitlement with id: \(insertId) for userId: \(userId), accountGroupId: \(accountGroupId)")
@@ -483,7 +483,7 @@ public final class EntitlementRepository: RepositoryProtocol, Sendable {
     ///
     /// - Parameter row: The MySQL result row containing the expected columns.
     /// - Returns: The mapped `Entitlement` instance.
-    /// - Throws: `AppError.migrationFailed` if required columns are missing
+    /// - Throws: `AppError.dataAccessFailed` if required columns are missing
     ///           or cannot be decoded to the expected types.
     private static func mapRow(_ row: MySQLRow) throws -> Entitlement {
         guard let id = row.column("id")?.uint64,
@@ -493,7 +493,7 @@ public final class EntitlementRepository: RepositoryProtocol, Sendable {
               let canCreate = row.column("can_create")?.bool,
               let canModify = row.column("can_modify")?.bool,
               let canDelete = row.column("can_delete")?.bool else {
-            throw AppError.migrationFailed
+            throw AppError.dataAccessFailed("Failed to map entitlement row: missing or invalid columns (id, user_id, account_group_id, can_read, can_create, can_modify, can_delete)")
         }
         return Entitlement(
             id: id,

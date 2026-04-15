@@ -191,14 +191,14 @@ public final class UserRepository: RepositoryProtocol, Sendable {
                 ).get()
                 guard let insertId = idRows.first?.column("insert_id")?.uint64 else {
                     logger.error("Failed to retrieve LAST_INSERT_ID after user creation for username: \(username)")
-                    throw AppError.migrationFailed
+                    throw AppError.dataAccessFailed("LAST_INSERT_ID returned nil after user creation for username: \(username)")
                 }
 
                 logger.info("Created user '\(username)' with id: \(insertId)")
                 return User(id: insertId, username: username, passwordHash: passwordHash)
             }
         } catch let appError as AppError {
-            // Re-throw application errors (including migrationFailed from LAST_INSERT_ID failure)
+            // Re-throw application errors (including dataAccessFailed from LAST_INSERT_ID failure)
             throw appError
         } catch let mysqlError as MySQLError {
             // Handle MySQL duplicate entry error (error code 1062 / ER_DUP_ENTRY)
@@ -353,13 +353,13 @@ public final class UserRepository: RepositoryProtocol, Sendable {
     ///
     /// - Parameter row: The MySQL result row containing the expected columns.
     /// - Returns: The mapped `User` instance.
-    /// - Throws: `AppError.migrationFailed` if required columns are missing
+    /// - Throws: `AppError.dataAccessFailed` if required columns are missing
     ///           or cannot be decoded to the expected types.
     private static func mapRow(_ row: MySQLRow) throws -> User {
         guard let id = row.column("id")?.uint64,
               let username = row.column("username")?.string,
               let passwordHash = row.column("password_hash")?.string else {
-            throw AppError.migrationFailed
+            throw AppError.dataAccessFailed("Failed to map user row: missing or invalid columns (id, username, password_hash)")
         }
         return User(id: id, username: username, passwordHash: passwordHash)
     }

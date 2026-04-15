@@ -884,15 +884,12 @@ public final class AccountRepository: RepositoryProtocol, Sendable {
         let ownershipDetails = row.column("ownership_details")?.string
         let valuationSchedule = row.column("valuation_schedule")?.string
 
-        // Cached valuation amount: DECIMAL(20,6) → String → Decimal
-        // MySQL returns DECIMAL as a string via MySQLNIO. We parse it to
-        // Swift Decimal to maintain financial precision.
-        let cachedValuationAmount: Decimal?
-        if let amountString = row.column("cached_valuation_amount")?.string {
-            cachedValuationAmount = Decimal(string: amountString)
-        } else {
-            cachedValuationAmount = nil
-        }
+        // Cached valuation amount: DECIMAL(20,6) → Decimal?
+        // MySQLNIO's `.decimal` accessor handles the NEWDECIMAL wire type in the
+        // binary protocol, reading the buffer as a string and converting via
+        // Decimal(string:). Using `.string` would return nil for NEWDECIMAL
+        // columns, silently breaking cached valuation readback (Rule 11).
+        let cachedValuationAmount: Decimal? = row.column("cached_valuation_amount")?.decimal
 
         // Cached value date: DATE → Date?
         let cachedValueDate: Date? = row.column("cached_value_date")?.date
