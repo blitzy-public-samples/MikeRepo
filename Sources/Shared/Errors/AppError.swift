@@ -88,6 +88,21 @@ public enum AppError: Error, Sendable {
     /// Consumers: ``ValuationService``, ``AccountService``.
     case invalidTimezone
 
+    // MARK: - Repository Operations
+
+    /// Operation not permitted on this repository.
+    ///
+    /// Thrown when a repository method is invoked that the specific repository
+    /// does not support. For example, a read-only repository (such as
+    /// ``TransactionRepository``, which is append-only per Rule 2) may throw
+    /// this error for delete operations.
+    ///
+    /// This error is also the recommended default for protocol-required methods
+    /// that a conforming repository intentionally does not implement.
+    ///
+    /// Consumers: ``RepositoryProtocol`` conformances, ``TransactionRepository``.
+    case operationNotPermitted
+
     // MARK: - Persistence Infrastructure
 
     /// Database migration failure.

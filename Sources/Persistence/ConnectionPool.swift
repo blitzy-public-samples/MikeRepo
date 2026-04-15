@@ -23,11 +23,11 @@ import Logging
 ///
 /// ## Thread Safety
 ///
-/// This class is safe to use from any concurrency domain. All properties are immutable
-/// (`let`), and the underlying ``EventLoopGroupConnectionPool`` uses `NIOLock` internally
-/// for all mutable state access. The `@unchecked Sendable` annotation is required because
-/// ``EventLoopGroupConnectionPool`` does not formally declare `Sendable` conformance in
-/// AsyncKit, despite being documented as thread-safe.
+/// This type is declared as an `actor`, providing Swift-native concurrency isolation
+/// without requiring `@unchecked Sendable` (Rule 12 / Gate 2 compliance). The actor
+/// boundary serializes access to the underlying ``EventLoopGroupConnectionPool``, which
+/// does not formally declare `Sendable` conformance in AsyncKit. All public methods are
+/// actor-isolated and must be called with `await`.
 ///
 /// ## Rule 8 — MySQLKit-Only Persistence
 ///
@@ -39,12 +39,18 @@ import Logging
 /// valuation results **and** update `accounts.cached_valuation_amount` /
 /// `accounts.cached_value_date` within the same MySQL transaction.
 ///
+/// ## Rule 12 — Gate 2 Compliance
+///
+/// This actor uses no `@unchecked Sendable` annotations or warning suppressions.
+/// Actor isolation provides safe concurrent access to the non-Sendable
+/// ``EventLoopGroupConnectionPool`` without bypassing the Swift 6 strict concurrency checker.
+///
 /// ## Rule 13 — Performance
 ///
 /// Default pool size of 10 connections per event loop is appropriate for the single-user
 /// desktop architecture, while providing sufficient concurrency for batch operations
 /// (1,000-account valuation under 30 seconds).
-public final class ConnectionPool: @unchecked Sendable {
+public actor ConnectionPool {
 
     // MARK: - Properties
 
@@ -221,11 +227,22 @@ public final class ConnectionPool: @unchecked Sendable {
     /// deinitialized. Failure to do so triggers an assertion in AsyncKit's
     /// ``EventLoopGroupConnectionPool`` deinit.
     ///
+    /// Uses `shutdownGracefully` with a checked continuation instead of `shutdownAsync()`
+    /// to avoid sending the actor-isolated pool reference across isolation boundaries.
+    ///
     /// - Throws: Advisory errors from connection closure. The pool is always fully
     ///   shut down once this method returns, even if an error is thrown.
     public func shutdown() async throws {
         logger.info("Shutting down connection pool")
-        try await pool.shutdownAsync()
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
+            pool.shutdownGracefully { error in
+                if let error = error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume()
+                }
+            }
+        }
         logger.info("Connection pool shutdown complete")
     }
 }

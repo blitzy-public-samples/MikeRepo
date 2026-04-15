@@ -37,7 +37,7 @@ import Foundation
 /// | ``instrumentId``        | `instrument_id`       | BIGINT UNSIGNED (nullable)          |
 /// | ``quantity``            | `quantity`            | DECIMAL(20,6) NOT NULL              |
 /// | ``assetType``           | `asset_type`          | ENUM('equity') NOT NULL             |
-/// | ``ownershipPercentage`` | `ownership_pct`       | DECIMAL(10,6)                       |
+/// | ``ownershipPercentage`` | `ownership_pct`       | DECIMAL(10,6) DEFAULT NULL          |
 /// | ``debitAmount``         | `debit_amount`        | DECIMAL(20,6) NOT NULL              |
 /// | ``creditAmount``        | `credit_amount`       | DECIMAL(20,6) NOT NULL              |
 /// | ``restatementRefId``    | `restatement_ref_id`  | BIGINT UNSIGNED (nullable)          |
@@ -92,9 +92,11 @@ public struct Transaction: Sendable, Equatable, Identifiable {
 
     /// Ownership percentage of the position, ranging from 0.0 to 100.0.
     ///
-    /// Maps to `transactions.ownership_pct` (DECIMAL(10,6)).
+    /// Maps to `transactions.ownership_pct` (DECIMAL(10,6) DEFAULT NULL).
+    /// Optional because the MySQL column is nullable — transactions that do not require
+    /// an ownership percentage (e.g., cash movements) may omit this field.
     /// Uses `Decimal` for exact decimal arithmetic matching MySQL precision.
-    public let ownershipPercentage: Decimal
+    public let ownershipPercentage: Decimal?
 
     /// Debit amount for this ledger entry.
     ///
@@ -146,7 +148,8 @@ public struct Transaction: Sendable, Equatable, Identifiable {
     ///     Pass `nil` for cash-only transactions.
     ///   - quantity: Number of units/shares (must use `Decimal` precision).
     ///   - assetType: Asset class — must be `"equity"` per Rule 5.
-    ///   - ownershipPercentage: Ownership percentage (0.0–100.0).
+    ///   - ownershipPercentage: Optional ownership percentage (0.0–100.0).
+    ///     Pass `nil` for transactions that do not require ownership tracking.
     ///   - debitAmount: Debit amount for this entry (must use `Decimal` precision).
     ///   - creditAmount: Credit amount for this entry (must use `Decimal` precision).
     ///   - restatementRefId: Optional FK to the original transaction being corrected.
@@ -158,7 +161,7 @@ public struct Transaction: Sendable, Equatable, Identifiable {
         instrumentId: UInt64?,
         quantity: Decimal,
         assetType: String,
-        ownershipPercentage: Decimal,
+        ownershipPercentage: Decimal?,
         debitAmount: Decimal,
         creditAmount: Decimal,
         restatementRefId: UInt64?,

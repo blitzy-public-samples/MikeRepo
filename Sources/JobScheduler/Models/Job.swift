@@ -88,7 +88,8 @@ public struct JobParameters: Sendable, Codable, Equatable {
     /// Optional list of account IDs to filter the report.
     /// Used by report generation jobs for account-scoped reporting.
     /// Each ID corresponds to the `accounts.id` column (BIGINT UNSIGNED) in MySQL.
-    public let accountSelection: [Int64]?
+    /// Uses `UInt64` to match the BIGINT UNSIGNED type convention across all modules.
+    public let accountSelection: [UInt64]?
 
     /// Optional target date for point-in-time reporting.
     /// Used by report generation jobs to specify the valuation date.
@@ -114,7 +115,7 @@ public struct JobParameters: Sendable, Codable, Equatable {
     ///   - sourceFileType: Optional type descriptor for CSV ingestion parsing strategy.
     public init(
         fieldSelection: [String]?,
-        accountSelection: [Int64]?,
+        accountSelection: [UInt64]?,
         targetDate: Date?,
         sourceFilePath: String?,
         sourceFileType: String?
@@ -145,7 +146,8 @@ public struct JobParameters: Sendable, Codable, Equatable {
 public struct Job: Sendable, Codable, Identifiable, Equatable {
     /// Unique job identifier, auto-incremented from the MySQL `jobs` table.
     /// Corresponds to `jobs.id` (BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY).
-    public let id: Int64
+    /// Uses `UInt64` to match the BIGINT UNSIGNED type convention across all modules.
+    public let id: UInt64
 
     /// The type of job: report generation or CSV ingestion.
     /// Determines which parameters are relevant and which execution path is taken.
@@ -179,7 +181,7 @@ public struct Job: Sendable, Codable, Identifiable, Equatable {
     ///   - createdAt: Timestamp when the job was created.
     ///   - completedAt: Optional timestamp when the job completed or failed.
     public init(
-        id: Int64,
+        id: UInt64,
         type: JobType,
         status: JobStatus,
         parameters: JobParameters,

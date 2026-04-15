@@ -118,7 +118,7 @@ The SeedTool produces synthetic tickers, company names, and six price fields (SO
 ### Full Test Suite
 
 ```bash
-xcodebuild test -scheme WealthLedger -destination 'platform=macOS'
+xcodebuild test -scheme WealthLedgerApp -destination 'platform=macOS'
 ```
 
 ### Unit Tests

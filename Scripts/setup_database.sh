@@ -33,18 +33,20 @@ set -euo pipefail
 # -------------------------------------------------------------
 # Configuration Variables
 # -------------------------------------------------------------
-# These constants define the database connection parameters.
-# They must match the MySQLConfiguration in DatabaseManager.swift:
+# Database connection parameters with environment variable overrides.
+# Set WEALTH_LEDGER_DB_* environment variables to customize, or use
+# the defaults below. These must match the MySQLConfiguration in
+# DatabaseManager.swift:
 #   MySQLConfiguration(hostname: "localhost", port: 3306,
 #                      username: "wealth_app",
-#                      password: "wealth_app_password",
+#                      password: "<from WEALTH_LEDGER_DB_PASSWORD>",
 #                      database: "wealth_ledger")
 # -------------------------------------------------------------
-DB_NAME="wealth_ledger"
-DB_USER="wealth_app"
-DB_PASSWORD="wealth_app_password"
-DB_HOST="localhost"
-DB_PORT="3306"
+DB_NAME="${WEALTH_LEDGER_DB_NAME:-wealth_ledger}"
+DB_USER="${WEALTH_LEDGER_DB_USER:-wealth_app}"
+DB_PASSWORD="${WEALTH_LEDGER_DB_PASSWORD:-wealth_app_password}"
+DB_HOST="${WEALTH_LEDGER_DB_HOST:-localhost}"
+DB_PORT="${WEALTH_LEDGER_DB_PORT:-3306}"
 
 # -------------------------------------------------------------
 # Script Directory Resolution
