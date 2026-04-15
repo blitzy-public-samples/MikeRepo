@@ -79,7 +79,6 @@ let package = Package(
             dependencies: [
                 "Persistence",
                 "ReferenceDataService",
-                "AccountManagement",
                 "Shared",
             ],
             path: "Sources/ValuationEngine"
