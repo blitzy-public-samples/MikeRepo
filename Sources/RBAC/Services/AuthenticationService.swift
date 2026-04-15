@@ -50,6 +50,7 @@
 
 import Foundation
 import Persistence
+import Shared
 
 // MARK: - AuthenticationService
 
@@ -227,6 +228,18 @@ public final class AuthenticationService: Sendable {
     /// - Throws: `AppError.duplicateUser` if the username already exists.
     ///   Other MySQL errors propagate as-is for infrastructure failure handling.
     public func createUser(username: String, password: String) async throws -> User {
+        // Step 0: Validate input — reject empty or whitespace-only usernames
+        // and empty passwords at the service layer. The DB enforces NOT NULL
+        // and UNIQUE, but an empty string passes both constraints, so we must
+        // guard against it here before any hashing or persistence occurs.
+        let trimmedUsername = username.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedUsername.isEmpty else {
+            throw AppError.dataAccessFailed("Username must not be empty or whitespace-only")
+        }
+        guard !password.isEmpty else {
+            throw AppError.dataAccessFailed("Password must not be empty")
+        }
+
         // Step 1: Hash the plaintext password BEFORE creating any User struct.
         // This ensures the plaintext password is never stored in a User instance.
         let hashedPassword = passwordHasher.hash(password)
