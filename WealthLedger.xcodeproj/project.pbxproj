@@ -1,0 +1,765 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		770000010000000000000000 /* AccountManagement in Frameworks */ = {isa = PBXBuildFile; productRef = 660000010000000000000000 /* AccountManagement */; };
+		770000020000000000000000 /* LedgerEngine in Frameworks */ = {isa = PBXBuildFile; productRef = 660000020000000000000000 /* LedgerEngine */; };
+		770000030000000000000000 /* ValuationEngine in Frameworks */ = {isa = PBXBuildFile; productRef = 660000030000000000000000 /* ValuationEngine */; };
+		770000040000000000000000 /* ReferenceDataService in Frameworks */ = {isa = PBXBuildFile; productRef = 660000040000000000000000 /* ReferenceDataService */; };
+		770000050000000000000000 /* JobScheduler in Frameworks */ = {isa = PBXBuildFile; productRef = 660000050000000000000000 /* JobScheduler */; };
+		770000060000000000000000 /* RBAC in Frameworks */ = {isa = PBXBuildFile; productRef = 660000060000000000000000 /* RBAC */; };
+		770000070000000000000000 /* UILayer in Frameworks */ = {isa = PBXBuildFile; productRef = 660000070000000000000000 /* UILayer */; };
+		770000080000000000000000 /* Persistence in Frameworks */ = {isa = PBXBuildFile; productRef = 660000080000000000000000 /* Persistence */; };
+		770000090000000000000000 /* Shared in Frameworks */ = {isa = PBXBuildFile; productRef = 660000090000000000000000 /* Shared */; };
+		7700000A0000000000000000 /* Persistence in Frameworks */ = {isa = PBXBuildFile; productRef = 6600000A0000000000000000 /* Persistence */; };
+		7700000B0000000000000000 /* ReferenceDataService in Frameworks */ = {isa = PBXBuildFile; productRef = 6600000B0000000000000000 /* ReferenceDataService */; };
+		7700000C0000000000000000 /* AccountManagement in Frameworks */ = {isa = PBXBuildFile; productRef = 6600000C0000000000000000 /* AccountManagement */; };
+		7700000D0000000000000000 /* Shared in Frameworks */ = {isa = PBXBuildFile; productRef = 6600000D0000000000000000 /* Shared */; };
+		7700000E0000000000000000 /* AccountManagement in Frameworks */ = {isa = PBXBuildFile; productRef = 6600000E0000000000000000 /* AccountManagement */; };
+		7700000F0000000000000000 /* LedgerEngine in Frameworks */ = {isa = PBXBuildFile; productRef = 6600000F0000000000000000 /* LedgerEngine */; };
+		770000100000000000000000 /* ValuationEngine in Frameworks */ = {isa = PBXBuildFile; productRef = 660000100000000000000000 /* ValuationEngine */; };
+		770000110000000000000000 /* ReferenceDataService in Frameworks */ = {isa = PBXBuildFile; productRef = 660000110000000000000000 /* ReferenceDataService */; };
+		770000120000000000000000 /* RBAC in Frameworks */ = {isa = PBXBuildFile; productRef = 660000120000000000000000 /* RBAC */; };
+		770000130000000000000000 /* Shared in Frameworks */ = {isa = PBXBuildFile; productRef = 660000130000000000000000 /* Shared */; };
+		770000140000000000000000 /* AccountManagement in Frameworks */ = {isa = PBXBuildFile; productRef = 660000140000000000000000 /* AccountManagement */; };
+		770000150000000000000000 /* LedgerEngine in Frameworks */ = {isa = PBXBuildFile; productRef = 660000150000000000000000 /* LedgerEngine */; };
+		770000160000000000000000 /* ValuationEngine in Frameworks */ = {isa = PBXBuildFile; productRef = 660000160000000000000000 /* ValuationEngine */; };
+		770000170000000000000000 /* ReferenceDataService in Frameworks */ = {isa = PBXBuildFile; productRef = 660000170000000000000000 /* ReferenceDataService */; };
+		770000180000000000000000 /* JobScheduler in Frameworks */ = {isa = PBXBuildFile; productRef = 660000180000000000000000 /* JobScheduler */; };
+		770000190000000000000000 /* RBAC in Frameworks */ = {isa = PBXBuildFile; productRef = 660000190000000000000000 /* RBAC */; };
+		7700001A0000000000000000 /* Persistence in Frameworks */ = {isa = PBXBuildFile; productRef = 6600001A0000000000000000 /* Persistence */; };
+		7700001B0000000000000000 /* Shared in Frameworks */ = {isa = PBXBuildFile; productRef = 6600001B0000000000000000 /* Shared */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		CC0000010000000000000000 /* Package.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Package.swift; sourceTree = "<group>"; };
+		CC0000020000000000000000 /* WealthLedgerApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = WealthLedgerApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		CC0000030000000000000000 /* SeedTool */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = SeedTool; sourceTree = BUILT_PRODUCTS_DIR; };
+		CC0000040000000000000000 /* UnitTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = UnitTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		CC0000050000000000000000 /* IntegrationTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = IntegrationTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		DD0000010000000000000000 /* WealthLedgerApp */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Sources/WealthLedgerApp;
+			sourceTree = "<group>";
+		};
+		DD0000020000000000000000 /* SeedTool */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Sources/SeedTool;
+			sourceTree = "<group>";
+		};
+		DD0000030000000000000000 /* UnitTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Tests/UnitTests;
+			sourceTree = "<group>";
+		};
+		DD0000040000000000000000 /* IntegrationTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Tests/IntegrationTests;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		110000010000000000000000 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				770000010000000000000000 /* AccountManagement in Frameworks */,
+				770000020000000000000000 /* LedgerEngine in Frameworks */,
+				770000030000000000000000 /* ValuationEngine in Frameworks */,
+				770000040000000000000000 /* ReferenceDataService in Frameworks */,
+				770000050000000000000000 /* JobScheduler in Frameworks */,
+				770000060000000000000000 /* RBAC in Frameworks */,
+				770000070000000000000000 /* UILayer in Frameworks */,
+				770000080000000000000000 /* Persistence in Frameworks */,
+				770000090000000000000000 /* Shared in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		110000020000000000000000 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				7700000A0000000000000000 /* Persistence in Frameworks */,
+				7700000B0000000000000000 /* ReferenceDataService in Frameworks */,
+				7700000C0000000000000000 /* AccountManagement in Frameworks */,
+				7700000D0000000000000000 /* Shared in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		110000030000000000000000 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				7700000E0000000000000000 /* AccountManagement in Frameworks */,
+				7700000F0000000000000000 /* LedgerEngine in Frameworks */,
+				770000100000000000000000 /* ValuationEngine in Frameworks */,
+				770000110000000000000000 /* ReferenceDataService in Frameworks */,
+				770000120000000000000000 /* RBAC in Frameworks */,
+				770000130000000000000000 /* Shared in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		110000040000000000000000 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				770000140000000000000000 /* AccountManagement in Frameworks */,
+				770000150000000000000000 /* LedgerEngine in Frameworks */,
+				770000160000000000000000 /* ValuationEngine in Frameworks */,
+				770000170000000000000000 /* ReferenceDataService in Frameworks */,
+				770000180000000000000000 /* JobScheduler in Frameworks */,
+				770000190000000000000000 /* RBAC in Frameworks */,
+				7700001A0000000000000000 /* Persistence in Frameworks */,
+				7700001B0000000000000000 /* Shared in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		BB0000010000000000000000 = {
+			isa = PBXGroup;
+			children = (
+				CC0000010000000000000000 /* Package.swift */,
+				DD0000010000000000000000 /* WealthLedgerApp */,
+				DD0000020000000000000000 /* SeedTool */,
+				DD0000030000000000000000 /* UnitTests */,
+				DD0000040000000000000000 /* IntegrationTests */,
+				BB0000020000000000000000 /* Products */,
+				BB0000030000000000000000 /* Frameworks */,
+			);
+			sourceTree = "<group>";
+		};
+		BB0000020000000000000000 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				CC0000020000000000000000 /* WealthLedgerApp.app */,
+				CC0000030000000000000000 /* SeedTool */,
+				CC0000040000000000000000 /* UnitTests.xctest */,
+				CC0000050000000000000000 /* IntegrationTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		BB0000030000000000000000 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		EE0000010000000000000000 /* WealthLedgerApp */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 330000020000000000000000 /* Build configuration list for PBXNativeTarget "WealthLedgerApp" */;
+			buildPhases = (
+				FF0000010000000000000000 /* Sources */,
+				110000010000000000000000 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				DD0000010000000000000000 /* WealthLedgerApp */,
+			);
+			name = WealthLedgerApp;
+			packageProductDependencies = (
+				660000010000000000000000 /* AccountManagement */,
+				660000020000000000000000 /* LedgerEngine */,
+				660000030000000000000000 /* ValuationEngine */,
+				660000040000000000000000 /* ReferenceDataService */,
+				660000050000000000000000 /* JobScheduler */,
+				660000060000000000000000 /* RBAC */,
+				660000070000000000000000 /* UILayer */,
+				660000080000000000000000 /* Persistence */,
+				660000090000000000000000 /* Shared */,
+			);
+			productName = WealthLedgerApp;
+			productReference = CC0000020000000000000000 /* WealthLedgerApp.app */;
+			productType = "com.apple.product-type.application";
+		};
+		EE0000020000000000000000 /* SeedTool */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 330000030000000000000000 /* Build configuration list for PBXNativeTarget "SeedTool" */;
+			buildPhases = (
+				FF0000020000000000000000 /* Sources */,
+				110000020000000000000000 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				DD0000020000000000000000 /* SeedTool */,
+			);
+			name = SeedTool;
+			packageProductDependencies = (
+				6600000A0000000000000000 /* Persistence */,
+				6600000B0000000000000000 /* ReferenceDataService */,
+				6600000C0000000000000000 /* AccountManagement */,
+				6600000D0000000000000000 /* Shared */,
+			);
+			productName = SeedTool;
+			productReference = CC0000030000000000000000 /* SeedTool */;
+			productType = "com.apple.product-type.tool";
+		};
+		EE0000030000000000000000 /* UnitTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 330000040000000000000000 /* Build configuration list for PBXNativeTarget "UnitTests" */;
+			buildPhases = (
+				FF0000030000000000000000 /* Sources */,
+				110000030000000000000000 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				DD0000030000000000000000 /* UnitTests */,
+			);
+			name = UnitTests;
+			packageProductDependencies = (
+				6600000E0000000000000000 /* AccountManagement */,
+				6600000F0000000000000000 /* LedgerEngine */,
+				660000100000000000000000 /* ValuationEngine */,
+				660000110000000000000000 /* ReferenceDataService */,
+				660000120000000000000000 /* RBAC */,
+				660000130000000000000000 /* Shared */,
+			);
+			productName = UnitTests;
+			productReference = CC0000040000000000000000 /* UnitTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		EE0000040000000000000000 /* IntegrationTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 330000050000000000000000 /* Build configuration list for PBXNativeTarget "IntegrationTests" */;
+			buildPhases = (
+				FF0000040000000000000000 /* Sources */,
+				110000040000000000000000 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				DD0000040000000000000000 /* IntegrationTests */,
+			);
+			name = IntegrationTests;
+			packageProductDependencies = (
+				660000140000000000000000 /* AccountManagement */,
+				660000150000000000000000 /* LedgerEngine */,
+				660000160000000000000000 /* ValuationEngine */,
+				660000170000000000000000 /* ReferenceDataService */,
+				660000180000000000000000 /* JobScheduler */,
+				660000190000000000000000 /* RBAC */,
+				6600001A0000000000000000 /* Persistence */,
+				6600001B0000000000000000 /* Shared */,
+			);
+			productName = IntegrationTests;
+			productReference = CC0000050000000000000000 /* IntegrationTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		AA0000010000000000000000 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1600;
+				LastUpgradeCheck = 1600;
+			};
+			buildConfigurationList = 330000010000000000000000 /* Build configuration list for PBXProject "WealthLedger" */;
+			compatibilityVersion = "Xcode 16.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = BB0000010000000000000000;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				440000010000000000000000 /* XCRemoteSwiftPackageReference "mysql-kit" */,
+				440000020000000000000000 /* XCRemoteSwiftPackageReference "BCryptSwift" */,
+				550000010000000000000000 /* XCLocalSwiftPackageReference "." */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = BB0000020000000000000000 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				EE0000010000000000000000 /* WealthLedgerApp */,
+				EE0000020000000000000000 /* SeedTool */,
+				EE0000030000000000000000 /* UnitTests */,
+				EE0000040000000000000000 /* IntegrationTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		FF0000010000000000000000 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		FF0000020000000000000000 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		FF0000030000000000000000 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		FF0000040000000000000000 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		220000010000000000000000 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = (
+					"DEBUG",
+					"$(inherited)",
+				);
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		220000020000000000000000 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = s;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		220000030000000000000000 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = arm64;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSMainStoryboardFile = "";
+				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.wealthledger.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+			};
+			name = Debug;
+		};
+		220000040000000000000000 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = arm64;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSMainStoryboardFile = "";
+				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.wealthledger.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+			};
+			name = Release;
+		};
+		220000050000000000000000 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = arm64;
+				CODE_SIGN_STYLE = Automatic;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Debug;
+		};
+		220000060000000000000000 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = arm64;
+				CODE_SIGN_STYLE = Automatic;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Release;
+		};
+		220000070000000000000000 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = arm64;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.wealthledger.UnitTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Debug;
+		};
+		220000080000000000000000 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = arm64;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.wealthledger.UnitTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Release;
+		};
+		220000090000000000000000 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = arm64;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.wealthledger.IntegrationTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Debug;
+		};
+		2200000A0000000000000000 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = arm64;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.wealthledger.IntegrationTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		330000010000000000000000 /* Build configuration list for PBXProject "WealthLedger" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				220000010000000000000000 /* Debug */,
+				220000020000000000000000 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		330000020000000000000000 /* Build configuration list for PBXNativeTarget "WealthLedgerApp" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				220000030000000000000000 /* Debug */,
+				220000040000000000000000 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		330000030000000000000000 /* Build configuration list for PBXNativeTarget "SeedTool" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				220000050000000000000000 /* Debug */,
+				220000060000000000000000 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		330000040000000000000000 /* Build configuration list for PBXNativeTarget "UnitTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				220000070000000000000000 /* Debug */,
+				220000080000000000000000 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		330000050000000000000000 /* Build configuration list for PBXNativeTarget "IntegrationTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				220000090000000000000000 /* Debug */,
+				2200000A0000000000000000 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		550000010000000000000000 /* XCLocalSwiftPackageReference "." */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = .;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		440000010000000000000000 /* XCRemoteSwiftPackageReference "mysql-kit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/vapor/mysql-kit.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 4.9.0;
+			};
+		};
+		440000020000000000000000 /* XCRemoteSwiftPackageReference "BCryptSwift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/wisetail/BCryptSwift.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.0.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		660000010000000000000000 /* AccountManagement */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AccountManagement;
+		};
+		660000020000000000000000 /* LedgerEngine */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = LedgerEngine;
+		};
+		660000030000000000000000 /* ValuationEngine */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ValuationEngine;
+		};
+		660000040000000000000000 /* ReferenceDataService */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ReferenceDataService;
+		};
+		660000050000000000000000 /* JobScheduler */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = JobScheduler;
+		};
+		660000060000000000000000 /* RBAC */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = RBAC;
+		};
+		660000070000000000000000 /* UILayer */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = UILayer;
+		};
+		660000080000000000000000 /* Persistence */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Persistence;
+		};
+		660000090000000000000000 /* Shared */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Shared;
+		};
+		6600000A0000000000000000 /* Persistence */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Persistence;
+		};
+		6600000B0000000000000000 /* ReferenceDataService */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ReferenceDataService;
+		};
+		6600000C0000000000000000 /* AccountManagement */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AccountManagement;
+		};
+		6600000D0000000000000000 /* Shared */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Shared;
+		};
+		6600000E0000000000000000 /* AccountManagement */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AccountManagement;
+		};
+		6600000F0000000000000000 /* LedgerEngine */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = LedgerEngine;
+		};
+		660000100000000000000000 /* ValuationEngine */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ValuationEngine;
+		};
+		660000110000000000000000 /* ReferenceDataService */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ReferenceDataService;
+		};
+		660000120000000000000000 /* RBAC */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = RBAC;
+		};
+		660000130000000000000000 /* Shared */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Shared;
+		};
+		660000140000000000000000 /* AccountManagement */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AccountManagement;
+		};
+		660000150000000000000000 /* LedgerEngine */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = LedgerEngine;
+		};
+		660000160000000000000000 /* ValuationEngine */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ValuationEngine;
+		};
+		660000170000000000000000 /* ReferenceDataService */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ReferenceDataService;
+		};
+		660000180000000000000000 /* JobScheduler */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = JobScheduler;
+		};
+		660000190000000000000000 /* RBAC */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = RBAC;
+		};
+		6600001A0000000000000000 /* Persistence */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Persistence;
+		};
+		6600001B0000000000000000 /* Shared */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Shared;
+		};
+/* End XCSwiftPackageProductDependency section */
+
+	};
+	rootObject = AA0000010000000000000000 /* Project object */;
+}
