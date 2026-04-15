@@ -1,3 +1,4 @@
+#if canImport(SwiftUI)
 // EntitlementFormView.swift
 // WealthLedger — UILayer Module
 //
@@ -191,3 +192,4 @@ public struct EntitlementFormView: View {
         .padding(8)
     }
 }
+#endif

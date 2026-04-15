@@ -89,14 +89,22 @@ public final class EntitlementService: Sendable {
     /// `updatePermissions`, `deleteByUserAndGroup`, and `findByAccountGroupId`.
     /// All database interaction is delegated to this repository — no direct
     /// MySQLKit usage in this service.
-    private let entitlementRepository: EntitlementRepository
+    ///
+    /// Typed as `any EntitlementRepositoryProtocol` to support dependency
+    /// injection of both the production ``EntitlementRepository`` and
+    /// lightweight mock implementations in unit tests.
+    private let entitlementRepository: any EntitlementRepositoryProtocol
 
     /// Repository for resolving account group objects from IDs.
     ///
     /// Used exclusively by `filterAccessibleGroups` to convert entitlement
     /// account group IDs into fully resolved `AccountGroup` instances via
     /// `findByIds`.
-    private let accountGroupRepository: AccountGroupRepository
+    ///
+    /// Typed as `any AccountGroupRepositoryProtocol` to support dependency
+    /// injection of both the production ``AccountGroupRepository`` and
+    /// lightweight mock implementations in unit tests.
+    private let accountGroupRepository: any AccountGroupRepositoryProtocol
 
     // MARK: - Initializer
 
@@ -110,8 +118,8 @@ public final class EntitlementService: Sendable {
     ///   - accountGroupRepository: The persistence layer for account group records,
     ///     used to resolve entitled group objects.
     public init(
-        entitlementRepository: EntitlementRepository,
-        accountGroupRepository: AccountGroupRepository
+        entitlementRepository: any EntitlementRepositoryProtocol,
+        accountGroupRepository: any AccountGroupRepositoryProtocol
     ) {
         self.entitlementRepository = entitlementRepository
         self.accountGroupRepository = accountGroupRepository

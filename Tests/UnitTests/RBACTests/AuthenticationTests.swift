@@ -12,7 +12,12 @@
 //
 // Rule 8 Compliance: No SwiftData imports.
 // Rule 9 Compliance: No network calls — all data in-memory.
+//
+// Platform: BCryptSwift requires the Apple Security framework (macOS only).
+// All tests in this file depend on PasswordHasher which uses BCryptSwift.
+// On non-Apple platforms (e.g., Linux CI), these tests are excluded.
 
+#if canImport(BCryptSwift)
 import Testing
 import Foundation
 @testable import RBAC
@@ -449,3 +454,5 @@ struct AuthenticationServiceCreateUserTests {
         #expect(createdUser.passwordHash.count >= 59 && createdUser.passwordHash.count <= 61)
     }
 }
+
+#endif // canImport(BCryptSwift)

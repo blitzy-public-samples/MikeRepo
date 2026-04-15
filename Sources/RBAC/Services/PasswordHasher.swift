@@ -42,7 +42,9 @@
 // must return zero results across the entire project.
 
 import Foundation
+#if canImport(BCryptSwift)
 import BCryptSwift
+#endif
 
 // MARK: - PasswordHasher
 
@@ -136,6 +138,7 @@ public struct PasswordHasher: Sendable {
     /// // Store `hash` in the database via UserRepository
     /// ```
     public func hash(_ password: String) -> String {
+        #if canImport(BCryptSwift)
         let salt = BCryptSwift.generateSaltWithNumberOfRounds(PasswordHasher.defaultRounds)
 
         guard let hashedPassword = BCryptSwift.hashPassword(password, withSalt: salt) else {
@@ -151,6 +154,11 @@ public struct PasswordHasher: Sendable {
         }
 
         return hashedPassword
+        #else
+        // BCryptSwift requires Apple Security framework (macOS only).
+        // On non-Apple platforms, this stub enables compilation for testing.
+        fatalError("PasswordHasher.hash requires BCryptSwift (macOS only)")
+        #endif
     }
 
     /// Verifies a plaintext password against a stored bcrypt hash.
@@ -189,6 +197,12 @@ public struct PasswordHasher: Sendable {
     /// // corrupted == false (nil from BCryptSwift coalesced to false)
     /// ```
     public func verify(_ password: String, against hash: String) -> Bool {
+        #if canImport(BCryptSwift)
         return BCryptSwift.verifyPassword(password, matchesHash: hash) ?? false
+        #else
+        // BCryptSwift requires Apple Security framework (macOS only).
+        // On non-Apple platforms, this stub enables compilation for testing.
+        fatalError("PasswordHasher.verify requires BCryptSwift (macOS only)")
+        #endif
     }
 }

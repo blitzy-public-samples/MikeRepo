@@ -91,6 +91,24 @@ public struct AccountGroup: Sendable, Equatable, Hashable, Codable {
     }
 }
 
+// MARK: - AccountGroupRepositoryProtocol
+
+/// Protocol defining the methods that ``EntitlementService`` requires from an
+/// account group data access layer.
+///
+/// This protocol enables dependency injection and testability: production code
+/// uses ``AccountGroupRepository`` (backed by MySQL), while unit tests inject
+/// lightweight mock implementations with zero database connections.
+///
+/// Inherits ``Sendable`` to satisfy Swift 6 strict concurrency requirements
+/// when stored as `any AccountGroupRepositoryProtocol` in a `Sendable` class.
+public protocol AccountGroupRepositoryProtocol: Sendable {
+
+    /// Finds multiple account groups by their primary key IDs.
+    /// Returns only the groups that exist; missing IDs are silently omitted.
+    func findByIds(_ ids: [UInt64]) async throws -> [AccountGroup]
+}
+
 // MARK: - AccountGroupRepository
 
 /// Repository for the `account_groups` table providing complete CRUD operations,
@@ -122,7 +140,7 @@ public struct AccountGroup: Sendable, Equatable, Hashable, Codable {
 /// The `accounts` and `entitlements` tables reference `account_groups` via FK.
 /// Deleting an account group may fail with a FK constraint error if other tables
 /// still reference the group.
-public final class AccountGroupRepository: RepositoryProtocol, Sendable {
+public final class AccountGroupRepository: RepositoryProtocol, AccountGroupRepositoryProtocol, Sendable {
 
     public typealias Entity = AccountGroup
     public typealias EntityID = UInt64

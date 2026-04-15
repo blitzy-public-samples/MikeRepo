@@ -107,7 +107,7 @@ let package = Package(
             dependencies: [
                 "Persistence",
                 "Shared",
-                .product(name: "BCryptSwift", package: "BCryptSwift"),
+                .product(name: "BCryptSwift", package: "BCryptSwift", condition: .when(platforms: [.macOS])),
             ],
             path: "Sources/RBAC"
         ),

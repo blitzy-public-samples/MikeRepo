@@ -137,6 +137,39 @@ public struct Entitlement: Sendable, Equatable, Hashable, Codable {
     }
 }
 
+// MARK: - EntitlementRepositoryProtocol
+
+/// Protocol defining the domain-specific methods that ``EntitlementService``
+/// requires from an entitlement data access layer.
+///
+/// This protocol enables dependency injection and testability: production code
+/// uses ``EntitlementRepository`` (backed by MySQL), while unit tests inject
+/// lightweight mock implementations with zero database connections.
+///
+/// Inherits ``Sendable`` to satisfy Swift 6 strict concurrency requirements
+/// when stored as `any EntitlementRepositoryProtocol` in a `Sendable` class.
+public protocol EntitlementRepositoryProtocol: Sendable {
+
+    /// Finds an entitlement by user ID and account group ID.
+    /// Returns `nil` if no entitlement exists for the pair.
+    func findByUserAndGroup(userId: UInt64, accountGroupId: UInt64) async throws -> Entitlement?
+
+    /// Finds all entitlements for a given user ID.
+    func findByUserId(_ userId: UInt64) async throws -> [Entitlement]
+
+    /// Finds all entitlements for a given account group ID.
+    func findByAccountGroupId(_ accountGroupId: UInt64) async throws -> [Entitlement]
+
+    /// Creates a new entitlement in the data store.
+    func create(_ entity: Entitlement) async throws -> Entitlement
+
+    /// Updates the permission flags for an existing entitlement.
+    func updatePermissions(id: UInt64, canRead: Bool, canCreate: Bool, canModify: Bool, canDelete: Bool) async throws
+
+    /// Deletes an entitlement by user ID and account group ID combination.
+    func deleteByUserAndGroup(userId: UInt64, accountGroupId: UInt64) async throws
+}
+
 // MARK: - EntitlementRepository
 
 /// Repository for the `entitlements` table providing complete CRUD operations,
@@ -167,7 +200,7 @@ public struct Entitlement: Sendable, Equatable, Hashable, Codable {
 /// The `entitlements` table has FKs to `users.id` and `account_groups.id`.
 /// Deletions of referenced users or groups will fail with FK constraint errors
 /// if entitlements still reference them.
-public final class EntitlementRepository: RepositoryProtocol, Sendable {
+public final class EntitlementRepository: RepositoryProtocol, EntitlementRepositoryProtocol, Sendable {
 
     public typealias Entity = Entitlement
     public typealias EntityID = UInt64

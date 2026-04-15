@@ -1,3 +1,4 @@
+#if canImport(SwiftUI)
 // Sources/UILayer/Components/AccountRowView.swift
 // WealthLedger — Reusable Account Row Component
 //
@@ -213,3 +214,4 @@ public struct AccountRowView: View {
         return formatter.string(from: amount as NSDecimalNumber) ?? "$0.00"
     }
 }
+#endif

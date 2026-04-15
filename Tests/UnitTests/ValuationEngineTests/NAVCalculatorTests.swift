@@ -20,7 +20,7 @@
 import Testing
 import Foundation
 @testable import ValuationEngine
-@testable import Persistence
+import struct Persistence.Position
 @testable import ReferenceDataService
 @testable import Shared
 

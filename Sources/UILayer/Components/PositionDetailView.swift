@@ -1,3 +1,4 @@
+#if canImport(SwiftUI)
 // PositionDetailView.swift
 // Sources/UILayer/Components/PositionDetailView.swift
 //
@@ -281,3 +282,4 @@ public struct PositionDetailView: View {
         return formatter.string(from: quantity as NSDecimalNumber) ?? "0"
     }
 }
+#endif

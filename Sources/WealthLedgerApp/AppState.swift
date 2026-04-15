@@ -1,3 +1,4 @@
+#if canImport(SwiftUI)
 // Sources/WealthLedgerApp/AppState.swift
 // WealthLedger — Observable Application State
 //
@@ -238,3 +239,4 @@ public final class AppState {
         selectedAccounts = []
     }
 }
+#endif
