@@ -79,6 +79,7 @@ let package = Package(
             dependencies: [
                 "Persistence",
                 "ReferenceDataService",
+                "AccountManagement",
                 "Shared",
             ],
             path: "Sources/ValuationEngine"
@@ -171,5 +172,6 @@ let package = Package(
             ],
             path: "Tests/IntegrationTests"
         ),
-    ]
+    ],
+    swiftLanguageModes: [.v6]
 )
