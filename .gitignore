@@ -1,10 +1,11 @@
 # Xcode
 DerivedData/
-*.xcuserstate
-*.xcworkspace
-xcuserdata/
+build/
 *.xcodeproj/xcuserdata/
-*.xcodeproj/project.xcworkspace/xcuserdata/
+*.xcworkspace/xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
+*.xccheckout
 
 # Swift Package Manager
 .build/
@@ -13,24 +14,19 @@ Package.resolved
 
 # macOS
 .DS_Store
-*.dSYM
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
 
 # IDE
+*.swp
+*.swo
+*~
 .vscode/
 .idea/
 
-# Build artifacts
-build/
-dist/
-
-# Environment
-.env
-.env.local
-
-# MySQL
-*.sql.bak
-
-# Temporary files
-*.tmp
-*.swp
-*~
+# Project-specific
+*.csv
+!Resources/**/*.csv
