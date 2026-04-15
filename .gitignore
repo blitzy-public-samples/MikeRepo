@@ -1,0 +1,36 @@
+# Xcode
+DerivedData/
+*.xcuserstate
+*.xcworkspace
+xcuserdata/
+*.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+
+# Swift Package Manager
+.build/
+.swiftpm/
+Package.resolved
+
+# macOS
+.DS_Store
+*.dSYM
+
+# IDE
+.vscode/
+.idea/
+
+# Build artifacts
+build/
+dist/
+
+# Environment
+.env
+.env.local
+
+# MySQL
+*.sql.bak
+
+# Temporary files
+*.tmp
+*.swp
+*~
