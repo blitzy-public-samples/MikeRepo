@@ -13,6 +13,62 @@ import MySQLKit
 @testable import Persistence
 @testable import Shared
 
+// MARK: - _SetupGuard (Cross-Suite Synchronization)
+
+/// Actor-based synchronization guard for ``TestDatabaseSetup/setUp()``.
+///
+/// Swift Testing runs `@Suite` types concurrently by default. When multiple
+/// integration test suites (e.g., `RBACIntegrationTests` and
+/// `ReferenceDataIntegrationTests`) start simultaneously, their first tests
+/// may all call `setUp()` before any single call completes. Without
+/// synchronization, this creates multiple ``DatabaseManager`` instances —
+/// overwritten `ConnectionPool`s get deallocated without ``ConnectionPool/shutdown()``,
+/// triggering an `AsyncKit` assertion failure:
+///
+///     ConnectionPool.shutdown() was not called before deinit.
+///
+/// This actor ensures:
+/// 1. Only the **first** caller executes the actual setup code.
+/// 2. Concurrent callers **wait** until the in-progress setup completes, then return.
+/// 3. Subsequent callers return **immediately** (setup already done).
+///
+/// The `Task`-based approach handles actor reentrancy correctly: when the first
+/// caller's `await task.value` suspends the actor, concurrent callers re-enter
+/// `ensureSetup`, observe `setupTask != nil`, and also await the same task.
+private actor _SetupGuard {
+
+    /// Shared singleton instance.
+    static let shared = _SetupGuard()
+
+    /// The `Task` performing setup, or `nil` if setup hasn't started.
+    private var setupTask: Task<Void, any Error>?
+
+    /// Execute the setup block exactly once. Concurrent callers wait for the
+    /// in-progress setup to complete. Subsequent callers return immediately.
+    ///
+    /// - Parameter block: The setup work to perform (runs at most once).
+    /// - Throws: Re-throws whatever `block` throws.
+    func ensureSetup(
+        _ block: @Sendable @escaping () async throws -> Void
+    ) async throws {
+        if let task = setupTask {
+            // Setup already started or completed — wait for result
+            try await task.value
+            return
+        }
+        // First caller: create and store the setup task
+        let task = Task { try await block() }
+        setupTask = task
+        try await task.value
+    }
+
+    /// Reset the guard, allowing ``TestDatabaseSetup/setUp()`` to run again
+    /// after ``TestDatabaseSetup/tearDown()`` cleans up shared infrastructure.
+    func reset() {
+        setupTask = nil
+    }
+}
+
 // MARK: - TestDatabaseSetup
 
 /// Shared test database infrastructure for all integration tests.
@@ -126,53 +182,57 @@ enum TestDatabaseSetup {
     ///
     /// - Throws: If database connection, schema creation, or migration execution fails.
     static func setUp() async throws {
-        // Step 1: Create an administrative connection without selecting a database.
-        // This is required for CREATE DATABASE and DROP DATABASE operations,
-        // which cannot target the currently-selected database.
-        let rootManager = DatabaseManager(
-            hostname: testHostname,
-            port: testPort,
-            username: testUsername,
-            password: testPassword,
-            database: ""
-        )
+        // Delegate to the actor-based guard to ensure only one concurrent caller
+        // actually executes setup. Other callers wait until it completes.
+        try await _SetupGuard.shared.ensureSetup {
+            // Step 1: Create an administrative connection without selecting a database.
+            // This is required for CREATE DATABASE and DROP DATABASE operations,
+            // which cannot target the currently-selected database.
+            let rootManager = DatabaseManager(
+                hostname: TestDatabaseSetup.testHostname,
+                port: TestDatabaseSetup.testPort,
+                username: TestDatabaseSetup.testUsername,
+                password: TestDatabaseSetup.testPassword,
+                database: ""
+            )
 
-        // Step 2-3: Drop any existing test schema and create a fresh one.
-        // Using a local constant ensures the @Sendable closure captures a value type.
-        let dbName = testDatabaseName
-        try await rootManager.pool.withConnection { db in
-            _ = try await db.simpleQuery("DROP DATABASE IF EXISTS `\(dbName)`").get()
-            _ = try await db.simpleQuery(
-                "CREATE DATABASE `\(dbName)` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
-            ).get()
-        }
+            // Step 2-3: Drop any existing test schema and create a fresh one.
+            // Using a local constant ensures the @Sendable closure captures a value type.
+            let dbName = TestDatabaseSetup.testDatabaseName
+            try await rootManager.pool.withConnection { db in
+                _ = try await db.simpleQuery("DROP DATABASE IF EXISTS `\(dbName)`").get()
+                _ = try await db.simpleQuery(
+                    "CREATE DATABASE `\(dbName)` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
+                ).get()
+            }
 
-        // Step 4: Shutdown the administrative connection — no longer needed.
-        try await rootManager.shutdown()
+            // Step 4: Shutdown the administrative connection — no longer needed.
+            try await rootManager.shutdown()
 
-        // Step 5: Create a DatabaseManager connected to the test database.
-        // This manager will be shared across all integration test suites.
-        databaseManager = DatabaseManager(
-            hostname: testHostname,
-            port: testPort,
-            username: testUsername,
-            password: testPassword,
-            database: testDatabaseName
-        )
+            // Step 5: Create a DatabaseManager connected to the test database.
+            // This manager will be shared across all integration test suites.
+            TestDatabaseSetup.databaseManager = DatabaseManager(
+                hostname: TestDatabaseSetup.testHostname,
+                port: TestDatabaseSetup.testPort,
+                username: TestDatabaseSetup.testUsername,
+                password: TestDatabaseSetup.testPassword,
+                database: TestDatabaseSetup.testDatabaseName
+            )
 
-        // Step 6: Store the connection pool reference for integration test suites.
-        // All repositories and services in test code use this pool.
-        connectionPool = databaseManager.pool
+            // Step 6: Store the connection pool reference for integration test suites.
+            // All repositories and services in test code use this pool.
+            TestDatabaseSetup.connectionPool = TestDatabaseSetup.databaseManager.pool
 
-        // Step 7: Run all 8 migration scripts in numerical order (001 → 008).
-        // Migration order is critical for FK constraint resolution (Rule 10):
-        //   001 users → 002 account_groups → 003 entitlements (FK→users, account_groups)
-        //   → 004 accounts (FK→account_groups) → 005 reference_data
-        //   → 006 positions (FK→accounts, reference_data)
-        //   → 007 transactions (FK→accounts, reference_data, self) → 008 indexes
-        let migrationManager = databaseManager.migrationManager
-        try await connectionPool.withConnection { db in
-            try await migrationManager.runMigrations(on: db.sql())
+            // Step 7: Run all 8 migration scripts in numerical order (001 → 008).
+            // Migration order is critical for FK constraint resolution (Rule 10):
+            //   001 users → 002 account_groups → 003 entitlements (FK→users, account_groups)
+            //   → 004 accounts (FK→account_groups) → 005 reference_data
+            //   → 006 positions (FK→accounts, reference_data)
+            //   → 007 transactions (FK→accounts, reference_data, self) → 008 indexes
+            let migrationManager = TestDatabaseSetup.databaseManager.migrationManager
+            try await TestDatabaseSetup.connectionPool.withConnection { db in
+                try await migrationManager.runMigrations(on: db.sql())
+            }
         }
     }
 
@@ -222,6 +282,10 @@ enum TestDatabaseSetup {
 
         // Step 5: Shutdown the administrative connection.
         try await rootManager.shutdown()
+
+        // Step 6: Reset the setup guard so setUp() can execute again
+        // if another test run starts in the same process.
+        await _SetupGuard.shared.reset()
     }
 
     // MARK: - Test Isolation Helpers

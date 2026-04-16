@@ -72,7 +72,30 @@ struct ReferenceDataIntegrationTests {
         let tearDownRef: @Sendable () async throws -> Void = TestDatabaseSetup.tearDown
         _ = tearDownRef
 
-        try await TestDatabaseSetup.cleanAllTables()
+        // Clean ONLY the tables this Reference Data test suite uses, not all tables.
+        // This prevents cross-suite interference when Swift Testing runs
+        // integration test suites concurrently — RBAC tests use `users`,
+        // `entitlements`, `account_groups`, and `accounts`, while this suite
+        // only uses `reference_data`. Truncating only our table avoids wiping
+        // data mid-test in another suite.
+        try await cleanReferenceDataTables()
+    }
+
+    /// Truncates only the tables used by Reference Data integration tests.
+    ///
+    /// Tables cleaned:
+    /// - `reference_data` — standalone table with no FK dependents in this suite
+    ///
+    /// FK checks are temporarily disabled for consistency with the original
+    /// `cleanAllTables()` contract, even though `reference_data` has no
+    /// FK dependencies within this truncation set.
+    private func cleanReferenceDataTables() async throws {
+        guard let pool = TestDatabaseSetup.connectionPool else { return }
+        try await pool.withConnection { db in
+            _ = try await db.simpleQuery("SET FOREIGN_KEY_CHECKS = 0").get()
+            _ = try await db.simpleQuery("TRUNCATE TABLE reference_data").get()
+            _ = try await db.simpleQuery("SET FOREIGN_KEY_CHECKS = 1").get()
+        }
     }
 
     /// Creates a UTC date for 2026-04-14 — primary test market date.
