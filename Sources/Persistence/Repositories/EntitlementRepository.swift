@@ -388,48 +388,54 @@ public final class EntitlementRepository: RepositoryProtocol, EntitlementReposit
         }
     }
 
-    /// Finds all entitlements for a given user ID.
+    /// Finds entitlements for a given user ID.
     ///
     /// Used by `EntitlementService.filterAccessibleGroups()` to determine which
     /// account groups a user can access. Returns all entitlements regardless of
     /// permission flag values — the service layer interprets which flags are active.
     ///
-    /// Results are ordered by `account_group_id` ascending for deterministic output.
+    /// Results are ordered by `account_group_id` ascending for deterministic output
+    /// and capped at ``AppConstants/defaultPagination`` (1,000) records as a
+    /// defensive guard (Rule 7 — Batch Memory Cap).
     ///
     /// - Parameter userId: The user's unique identifier.
-    /// - Returns: Array of all entitlements for the user, ordered by account group ID.
+    /// - Returns: Array of entitlements for the user, ordered by account group ID.
     ///            Returns empty array if the user has no entitlements.
     public func findByUserId(_ userId: UInt64) async throws -> [Entitlement] {
         let logger = self.logger
+        let limit = AppConstants.defaultPagination
         return try await pool.withConnection { db in
-            logger.info("Finding all entitlements for userId: \(userId)")
+            logger.info("Finding entitlements for userId: \(userId) (limit \(limit))")
             let rows = try await db.query(
-                "SELECT id, user_id, account_group_id, can_read, can_create, can_modify, can_delete FROM entitlements WHERE user_id = ? ORDER BY account_group_id ASC",
-                [MySQLData(int: Int(userId))]
+                "SELECT id, user_id, account_group_id, can_read, can_create, can_modify, can_delete FROM entitlements WHERE user_id = ? ORDER BY account_group_id ASC LIMIT ?",
+                [MySQLData(int: Int(userId)), MySQLData(int: limit)]
             ).get()
             logger.info("Found \(rows.count) entitlement(s) for userId: \(userId)")
             return try rows.map { try EntitlementRepository.mapRow($0) }
         }
     }
 
-    /// Finds all entitlements for a given account group ID.
+    /// Finds entitlements for a given account group ID.
     ///
-    /// Returns all user entitlements associated with the specified account group.
+    /// Returns user entitlements associated with the specified account group.
     /// Useful for admin views showing which users have access to a particular group
     /// and what permission levels they hold.
     ///
-    /// Results are ordered by `user_id` ascending for deterministic output.
+    /// Results are ordered by `user_id` ascending for deterministic output
+    /// and capped at ``AppConstants/defaultPagination`` (1,000) records as a
+    /// defensive guard (Rule 7 — Batch Memory Cap).
     ///
     /// - Parameter accountGroupId: The account group's unique identifier.
-    /// - Returns: Array of all entitlements for the account group, ordered by user ID.
+    /// - Returns: Array of entitlements for the account group, ordered by user ID.
     ///            Returns empty array if no users have entitlements for this group.
     public func findByAccountGroupId(_ accountGroupId: UInt64) async throws -> [Entitlement] {
         let logger = self.logger
+        let limit = AppConstants.defaultPagination
         return try await pool.withConnection { db in
-            logger.info("Finding all entitlements for accountGroupId: \(accountGroupId)")
+            logger.info("Finding entitlements for accountGroupId: \(accountGroupId) (limit \(limit))")
             let rows = try await db.query(
-                "SELECT id, user_id, account_group_id, can_read, can_create, can_modify, can_delete FROM entitlements WHERE account_group_id = ? ORDER BY user_id ASC",
-                [MySQLData(int: Int(accountGroupId))]
+                "SELECT id, user_id, account_group_id, can_read, can_create, can_modify, can_delete FROM entitlements WHERE account_group_id = ? ORDER BY user_id ASC LIMIT ?",
+                [MySQLData(int: Int(accountGroupId)), MySQLData(int: limit)]
             ).get()
             logger.info("Found \(rows.count) entitlement(s) for accountGroupId: \(accountGroupId)")
             return try rows.map { try EntitlementRepository.mapRow($0) }

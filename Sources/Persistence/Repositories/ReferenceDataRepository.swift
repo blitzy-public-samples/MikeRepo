@@ -341,46 +341,52 @@ public final class ReferenceDataRepository: RepositoryProtocol, Sendable {
         }
     }
 
-    /// Finds all reference data records for a given ticker, ordered by market date descending.
+    /// Finds reference data records for a given ticker, ordered by market date descending.
     ///
-    /// Returns the complete price history for a single security across all available market dates.
+    /// Returns the price history for a single security across available market dates,
+    /// capped at ``AppConstants/defaultPagination`` (1,000) records as a defensive
+    /// guard (Rule 7 — Batch Memory Cap).
     ///
     /// - Parameter ticker: The ticker symbol to match exactly.
     /// - Returns: An array of `ReferenceData` records ordered by market date descending (newest first).
     /// - Throws: `AppError.migrationFailed` if any row cannot be decoded.
     public func findByTicker(_ ticker: String) async throws -> [ReferenceData] {
         let logger = self.logger
+        let limit = AppConstants.defaultPagination
         return try await pool.withConnection { db in
-            logger.info("Finding all reference data for ticker: \(ticker)")
+            logger.info("Finding reference data for ticker: \(ticker) (limit \(limit))")
             let rows = try await db.query(
                 """
                 SELECT id, ticker, name, sod_bid, sod_ask, eod_bid, eod_ask, market_date \
-                FROM reference_data WHERE ticker = ? ORDER BY market_date DESC
+                FROM reference_data WHERE ticker = ? ORDER BY market_date DESC LIMIT ?
                 """,
-                [MySQLData(string: ticker)]
+                [MySQLData(string: ticker), MySQLData(int: limit)]
             ).get()
             return try rows.map { try ReferenceDataRepository.mapRow($0) }
         }
     }
 
-    /// Finds all reference data records for a given market date, ordered by ticker alphabetically.
+    /// Finds reference data records for a given market date, ordered by ticker alphabetically.
     ///
     /// Used by `ValuationEngine` during batch valuation to retrieve all EOD prices for a
     /// valuation date in a single query, avoiding per-ticker round-trips.
+    /// Capped at ``AppConstants/defaultPagination`` (1,000) records as a defensive
+    /// guard (Rule 7 — Batch Memory Cap).
     ///
     /// - Parameter marketDate: The market date to match exactly.
     /// - Returns: An array of `ReferenceData` records for the given date, ordered by ticker.
     /// - Throws: `AppError.migrationFailed` if any row cannot be decoded.
     public func findByDate(_ marketDate: Date) async throws -> [ReferenceData] {
         let logger = self.logger
+        let limit = AppConstants.defaultPagination
         return try await pool.withConnection { db in
-            logger.info("Finding all reference data for date: \(marketDate)")
+            logger.info("Finding reference data for date: \(marketDate) (limit \(limit))")
             let rows = try await db.query(
                 """
                 SELECT id, ticker, name, sod_bid, sod_ask, eod_bid, eod_ask, market_date \
-                FROM reference_data WHERE market_date = ? ORDER BY ticker
+                FROM reference_data WHERE market_date = ? ORDER BY ticker LIMIT ?
                 """,
-                [ReferenceDataRepository.mysqlDate(marketDate)]
+                [ReferenceDataRepository.mysqlDate(marketDate), MySQLData(int: limit)]
             ).get()
             return try rows.map { try ReferenceDataRepository.mapRow($0) }
         }

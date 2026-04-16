@@ -319,20 +319,23 @@ public final class PositionRepository: RepositoryProtocol {
 
     /// Retrieves all positions for a single account.
     ///
-    /// This is the **primary method for ValuationEngine** — loads every
-    /// position held by an account for NAV calculation:
+    /// This is the **primary method for ValuationEngine** — loads positions
+    /// held by an account for NAV calculation:
     /// `Σ(quantity × EOD midpoint) + cash_balance`.
     ///
-    /// Results are ordered by `instrument_id` for deterministic output.
+    /// Results are ordered by `instrument_id` for deterministic output and
+    /// capped at ``AppConstants/defaultPagination`` (1,000) records as a
+    /// defensive guard (Rule 7 — Batch Memory Cap).
     /// The query leverages the `idx_positions_account` index from migration 008.
     ///
     /// - Parameter accountId: The owning account's primary key.
     /// - Returns: All positions for the account, or an empty array if none exist.
     /// - Throws: Database connection or query execution errors.
     public func findByAccountId(_ accountId: UInt64) async throws -> [Position] {
-        try await pool.withConnection { db in
+        let limit = AppConstants.defaultPagination
+        return try await pool.withConnection { db in
             let rows = try await db.sql().raw(
-                "SELECT \(unsafeRaw: Self.selectColumns) FROM positions WHERE account_id = \(bind: accountId) ORDER BY instrument_id"
+                "SELECT \(unsafeRaw: Self.selectColumns) FROM positions WHERE account_id = \(bind: accountId) ORDER BY instrument_id LIMIT \(bind: limit)"
             ).all()
             return try rows.map { try self.mapRow($0) }
         }

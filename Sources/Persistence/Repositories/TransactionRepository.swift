@@ -536,11 +536,13 @@ public final class TransactionRepository: RepositoryProtocol {
         return persisted
     }
 
-    /// Retrieves all offsetting entries that reference a given original
+    /// Retrieves offsetting entries that reference a given original
     /// transaction.
     ///
     /// Results are ordered by `created_at ASC` (oldest first) so that the
-    /// chronological sequence of restatements is preserved.
+    /// chronological sequence of restatements is preserved, and capped at
+    /// ``AppConstants/defaultPagination`` (1,000) records as a defensive
+    /// guard (Rule 7 — Batch Memory Cap).
     ///
     /// - Parameter originalId: The primary key of the original transaction.
     /// - Returns: All offsetting entries for the original, or an empty array
@@ -549,9 +551,10 @@ public final class TransactionRepository: RepositoryProtocol {
     public func findRestatements(
         forTransactionId originalId: UInt64
     ) async throws -> [Transaction] {
-        try await pool.withConnection { db in
+        let limit = AppConstants.defaultPagination
+        return try await pool.withConnection { db in
             let rows = try await db.sql().raw(
-                "SELECT \(unsafeRaw: Self.selectColumns) FROM transactions WHERE restatement_ref_id = \(bind: originalId) ORDER BY created_at"
+                "SELECT \(unsafeRaw: Self.selectColumns) FROM transactions WHERE restatement_ref_id = \(bind: originalId) ORDER BY created_at LIMIT \(bind: limit)"
             ).all()
             return try rows.map { try self.mapRow($0) }
         }

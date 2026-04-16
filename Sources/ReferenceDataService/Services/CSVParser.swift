@@ -108,9 +108,13 @@ public struct CSVParser: Sendable {
     /// the header row for required columns and each data row for correct
     /// types and non-zero prices (Rule 6).
     ///
-    /// Lines are processed in batches of ``AppConstants/batchSize`` (1 000)
-    /// to enforce the batch memory cap (Rule 7). The caller is responsible
-    /// for batching the returned records during database insertion.
+    /// Internally delegates to ``parseReferenceDataCSVBatched(at:handler:)``
+    /// which processes lines in batches of ``AppConstants/batchSize`` (1,000),
+    /// keeping only one batch of raw string lines in memory at a time
+    /// (Rule 7 — Batch Memory Cap).  The ``[ReferenceData]`` result array
+    /// accumulates as batches are parsed.  For true streaming (where even
+    /// the result array does not accumulate), use the batched variant
+    /// directly with per-batch insertion.
     ///
     /// **Required columns:**
     /// `ticker`, `name`, `sod_bid`, `sod_ask`, `eod_bid`, `eod_ask`,
@@ -122,53 +126,10 @@ public struct CSVParser: Sendable {
     /// - Throws: ``CSVParseError`` if the file cannot be read, column
     ///   validation fails, or any row contains invalid data.
     public func parseReferenceDataCSV(at filePath: String) throws -> [ReferenceData] {
-        let lines = try readLinesStreaming(from: filePath)
-
-        guard !lines.isEmpty else {
-            throw CSVParseError.emptyFile
-        }
-
-        // First line is the header row
-        let headerFields = splitCSVLine(lines[0])
-        let columnMap = try validateReferenceDataHeaders(headerFields)
-
-        let dataLines = Array(lines.dropFirst())
-        guard !dataLines.isEmpty else {
-            throw CSVParseError.emptyFile
-        }
-
-        // Create DateFormatter once for all rows (performance optimisation).
-        // Created locally — not stored — so no concurrency issue.
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyy-MM-dd"
-        dateFormatter.locale = Locale(identifier: "en_US_POSIX")
-
-        // Process lines in batches of AppConstants.batchSize (Rule 7).
         var results: [ReferenceData] = []
-        results.reserveCapacity(dataLines.count)
-
-        let batchSize = AppConstants.batchSize
-        var batchStart = 0
-
-        while batchStart < dataLines.count {
-            let batchEnd = min(batchStart + batchSize, dataLines.count)
-            let batch = dataLines[batchStart..<batchEnd]
-
-            for (offset, line) in batch.enumerated() {
-                // +2: one-indexed line number + header row
-                let lineNumber = batchStart + offset + 2
-                let record = try parseReferenceDataRow(
-                    line: line,
-                    columnMap: columnMap,
-                    lineNumber: lineNumber,
-                    dateFormatter: dateFormatter
-                )
-                results.append(record)
-            }
-
-            batchStart = batchEnd
+        try parseReferenceDataCSVBatched(at: filePath) { batch in
+            results.append(contentsOf: batch)
         }
-
         return results
     }
 
@@ -207,6 +168,92 @@ public struct CSVParser: Sendable {
         }
 
         return (headers: headers, rows: rows)
+    }
+
+    /// Parses a reference data CSV file in batches, calling `handler` for
+    /// each batch of parsed records.
+    ///
+    /// **True streaming implementation**: reads the file using buffered I/O
+    /// via `FileHandle` in 64 KB chunks (Rule 13 — files up to 100 MB).
+    /// At any point, only one batch of raw string lines AND one batch of
+    /// parsed ``ReferenceData`` records reside in memory simultaneously.
+    /// Peak string memory is proportional to ``AppConstants/batchSize``
+    /// (1,000 lines) regardless of total file size, supporting Rule 7
+    /// (batch memory cap) and Rule 13 (100 MB CSV ingestion).
+    ///
+    /// The header row is validated once at the start.  Subsequent data lines
+    /// are accumulated into batches of ``AppConstants/batchSize`` (1,000)
+    /// and yielded to `handler`.  After the handler returns, the string
+    /// batch is released before the next batch is built.
+    ///
+    /// This is the preferred method for CSV ingestion where the caller can
+    /// process each batch independently (e.g., bulk-insert into MySQL via
+    /// ``ReferenceDataRepository``).
+    ///
+    /// **Required columns:**
+    /// `ticker`, `name`, `sod_bid`, `sod_ask`, `eod_bid`, `eod_ask`,
+    /// `market_date`
+    ///
+    /// - Parameters:
+    ///   - filePath: Absolute or relative path to the CSV file.
+    ///   - handler: Closure called once per batch with an array of parsed
+    ///     ``ReferenceData`` records.  The closure may throw to abort
+    ///     processing.
+    /// - Throws: ``CSVParseError`` if the file cannot be read, column
+    ///   validation fails, or any row contains invalid data.  Also rethrows
+    ///   any error from `handler`.
+    public func parseReferenceDataCSVBatched(
+        at filePath: String,
+        handler: ([ReferenceData]) throws -> Void
+    ) throws {
+        var headerLine: String?
+        var columnMap: [String: Int] = [:]
+        var lineNumber = 1
+        var hasDataLines = false
+
+        // Create DateFormatter once for all rows (performance optimisation).
+        // Created locally — not stored — so no concurrency issue.
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+
+        try readLinesInBatches(
+            from: filePath,
+            batchSize: AppConstants.batchSize
+        ) { batch in
+            var batchRecords: [ReferenceData] = []
+
+            for line in batch {
+                if headerLine == nil {
+                    // First line is the header row — validate columns
+                    headerLine = line
+                    let headerFields = splitCSVLine(line)
+                    columnMap = try validateReferenceDataHeaders(headerFields)
+                    lineNumber = 2
+                } else {
+                    let record = try parseReferenceDataRow(
+                        line: line,
+                        columnMap: columnMap,
+                        lineNumber: lineNumber,
+                        dateFormatter: dateFormatter
+                    )
+                    batchRecords.append(record)
+                    lineNumber += 1
+                    hasDataLines = true
+                }
+            }
+
+            if !batchRecords.isEmpty {
+                try handler(batchRecords)
+            }
+        }
+
+        guard headerLine != nil else {
+            throw CSVParseError.emptyFile
+        }
+        guard hasDataLines else {
+            throw CSVParseError.emptyFile
+        }
     }
 
     /// Validates that CSV headers contain all required reference data columns.
@@ -407,7 +454,95 @@ public struct CSVParser: Sendable {
 
     // MARK: - Private — Streaming File Reader
 
-    /// Reads lines from a file using buffered I/O for memory efficiency.
+    /// Reads lines from a file in 64 KB I/O chunks and yields them to a
+    /// handler in batches of at most `batchSize` lines.
+    ///
+    /// Only one batch of `String` values is alive at a time — the handler
+    /// processes and releases strings before the next batch is built.  This
+    /// keeps peak string memory proportional to
+    /// `batchSize × average_line_length` rather than total file size,
+    /// supporting Rule 7 (batch memory cap) and Rule 13 (100 MB CSV
+    /// ingestion without excessive memory usage).
+    ///
+    /// Uses the same byte-level `FileHandle` and `0x0A` line-feed scanning
+    /// strategy as ``readLinesStreaming(from:)`` for consistent line
+    /// termination handling (Unix `\n` and Windows `\r\n`).
+    ///
+    /// - Parameters:
+    ///   - filePath: Absolute or relative path to the file.
+    ///   - batchSize: Maximum number of lines per batch (typically
+    ///     ``AppConstants/batchSize``, i.e. 1,000).
+    ///   - handler: Closure called once per batch with an array of
+    ///     non-empty lines.  The closure may throw to abort processing.
+    /// - Throws: ``CSVParseError/fileNotFound(_:)`` if the file does not
+    ///   exist or cannot be opened; any error propagated from `handler`.
+    private func readLinesInBatches(
+        from filePath: String,
+        batchSize: Int,
+        handler: ([String]) throws -> Void
+    ) throws {
+        let fileURL = URL(fileURLWithPath: filePath)
+
+        guard FileManager.default.fileExists(atPath: fileURL.path) else {
+            throw CSVParseError.fileNotFound(filePath)
+        }
+
+        guard let fileHandle = FileHandle(forReadingAtPath: fileURL.path) else {
+            throw CSVParseError.fileNotFound(filePath)
+        }
+        defer { fileHandle.closeFile() }
+
+        let newlineByte: UInt8 = 0x0A   // \n
+        let carriageReturn: UInt8 = 0x0D // \r
+        let ioBufferSize = Self.readBufferSize
+
+        var lineBuffer = Data()
+        var currentBatch: [String] = []
+        currentBatch.reserveCapacity(min(batchSize, 1_000))
+
+        while true {
+            let data: Data = fileHandle.readData(ofLength: ioBufferSize)
+            if data.isEmpty { break }
+
+            for byte in data {
+                if byte == newlineByte {
+                    // End of line — strip trailing \r if present
+                    if !lineBuffer.isEmpty && lineBuffer.last == carriageReturn {
+                        lineBuffer.removeLast()
+                    }
+                    if let line = String(data: lineBuffer, encoding: .utf8),
+                       !line.isEmpty {
+                        currentBatch.append(line)
+                        if currentBatch.count >= batchSize {
+                            try handler(currentBatch)
+                            currentBatch.removeAll(keepingCapacity: true)
+                        }
+                    }
+                    lineBuffer.removeAll(keepingCapacity: true)
+                } else {
+                    lineBuffer.append(byte)
+                }
+            }
+        }
+
+        // Process any content remaining after the last newline
+        if !lineBuffer.isEmpty {
+            if lineBuffer.last == carriageReturn {
+                lineBuffer.removeLast()
+            }
+            if let line = String(data: lineBuffer, encoding: .utf8),
+               !line.isEmpty {
+                currentBatch.append(line)
+            }
+        }
+
+        // Yield the final partial batch
+        if !currentBatch.isEmpty {
+            try handler(currentBatch)
+        }
+    }
+
+    /// Reads all lines from a file using buffered I/O for memory efficiency.
     ///
     /// Uses `FileHandle` to read in 64 KB chunks and scans for line-feed
     /// bytes (`0x0A`) at the **byte level** to avoid Swift's grapheme
@@ -416,9 +551,13 @@ public struct CSVParser: Sendable {
     /// line so both Unix (`\n`) and Windows (`\r\n`) endings are
     /// normalised transparently.
     ///
-    /// Peak memory usage stays proportional to the buffer size rather
-    /// than the total file size, supporting files up to 100 MB without
-    /// crash (Rule 13).
+    /// - Note: This method accumulates **all** lines into a single array
+    ///   before returning.  For large files (tens of MB or more), prefer
+    ///   ``readLinesInBatches(from:batchSize:handler:)`` which keeps only
+    ///   one batch of lines in memory at a time.
+    ///
+    /// This method is retained for ``parseCSV(at:)`` which must return all
+    /// rows as a single collection.
     ///
     /// - Parameter filePath: Absolute or relative path to the file.
     /// - Returns: Array of non-empty lines with line terminators stripped.
