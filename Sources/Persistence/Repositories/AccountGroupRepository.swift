@@ -109,6 +109,73 @@ public protocol AccountGroupRepositoryProtocol: Sendable {
     func findByIds(_ ids: [UInt64]) async throws -> [AccountGroup]
 }
 
+// MARK: - AccountGroupServiceRepositoryProtocol
+
+/// Broader protocol defining the full set of repository methods that
+/// ``AccountGroupService`` requires for complete CRUD operations, search,
+/// and count queries.
+///
+/// This protocol extends ``AccountGroupRepositoryProtocol`` (which provides
+/// `findByIds` for ``EntitlementService``) with the additional methods needed
+/// by ``AccountGroupService``: `create`, `findById`, `findAll`, `update`,
+/// `delete`, `findByName`, and `count`.
+///
+/// ## Dependency Injection Pattern
+///
+/// Follows the same protocol-based DI convention used by ``EntitlementService``
+/// (with ``EntitlementRepositoryProtocol``) and ``AuthenticationService``
+/// (with ``UserRepositoryProtocol``). Production code injects
+/// ``AccountGroupRepository``; unit tests inject lightweight mock
+/// implementations with zero database connections.
+///
+/// Inherits ``Sendable`` via ``AccountGroupRepositoryProtocol`` to satisfy
+/// Swift 6 strict concurrency requirements (Gate 2).
+public protocol AccountGroupServiceRepositoryProtocol: AccountGroupRepositoryProtocol {
+
+    /// Creates a new account group in the data store.
+    ///
+    /// - Parameter entity: The account group to insert (the `id` field may be
+    ///   ignored if the backing store auto-generates IDs).
+    /// - Returns: The created account group with the store-assigned ID populated.
+    func create(_ entity: AccountGroup) async throws -> AccountGroup
+
+    /// Retrieves a single account group by its primary key.
+    ///
+    /// - Parameter id: The account group's unique ID.
+    /// - Returns: The matching account group, or `nil` if not found.
+    func findById(_ id: UInt64) async throws -> AccountGroup?
+
+    /// Retrieves a paginated list of all account groups.
+    ///
+    /// - Parameters:
+    ///   - page: 1-based page number.
+    ///   - pageSize: Maximum records per page (capped at 1,000 per Rule 7).
+    /// - Returns: Array of account groups for the requested page.
+    func findAll(page: Int, pageSize: Int) async throws -> [AccountGroup]
+
+    /// Updates an existing account group.
+    ///
+    /// - Parameter entity: The account group with updated fields.
+    /// - Returns: The updated account group.
+    func update(_ entity: AccountGroup) async throws -> AccountGroup
+
+    /// Deletes an account group by its primary key.
+    ///
+    /// - Parameter id: The primary key of the account group to delete.
+    func delete(_ id: UInt64) async throws
+
+    /// Finds a single account group by exact name match.
+    ///
+    /// - Parameter name: The group name to search for (exact match).
+    /// - Returns: The matching account group, or `nil` if not found.
+    func findByName(_ name: String) async throws -> AccountGroup?
+
+    /// Returns the total count of account groups in the data store.
+    ///
+    /// - Returns: The total number of account groups.
+    func count() async throws -> Int
+}
+
 // MARK: - AccountGroupRepository
 
 /// Repository for the `account_groups` table providing complete CRUD operations,
@@ -140,7 +207,7 @@ public protocol AccountGroupRepositoryProtocol: Sendable {
 /// The `accounts` and `entitlements` tables reference `account_groups` via FK.
 /// Deleting an account group may fail with a FK constraint error if other tables
 /// still reference the group.
-public final class AccountGroupRepository: RepositoryProtocol, AccountGroupRepositoryProtocol, Sendable {
+public final class AccountGroupRepository: RepositoryProtocol, AccountGroupServiceRepositoryProtocol, Sendable {
 
     public typealias Entity = AccountGroup
     public typealias EntityID = UInt64

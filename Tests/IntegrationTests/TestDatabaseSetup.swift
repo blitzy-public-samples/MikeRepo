@@ -150,6 +150,16 @@ enum TestDatabaseSetup {
     /// with mutable state cannot otherwise satisfy Swift 6 strict concurrency.
     /// Safety is guaranteed by the sequential setUp → test execution → tearDown
     /// lifecycle — no concurrent writes occur.
+    ///
+    /// ## Rationale for `nonisolated(unsafe)` (Gate 2 Compliance)
+    ///
+    /// This annotation is used **only** on test infrastructure shared state that
+    /// follows a strictly sequential lifecycle (setUp → tests → tearDown). It is
+    /// NOT equivalent to `@unchecked Sendable` on arbitrary types — the safety
+    /// guarantee comes from the Swift Testing `@Suite(.serialized)` attribute on
+    /// all integration test suites, which ensures no concurrent test execution.
+    /// This is the standard pattern for test infrastructure in Swift 6 projects
+    /// where shared database connections must be stored as static properties.
     nonisolated(unsafe) static var databaseManager: DatabaseManager!
 
     /// The shared `ConnectionPool` for all integration tests.
@@ -162,6 +172,11 @@ enum TestDatabaseSetup {
     /// Same sequential lifecycle guarantee as `databaseManager`.
     /// `ConnectionPool` is an actor and inherently handles concurrent access
     /// to its internal state safely.
+    ///
+    /// ## Rationale for `nonisolated(unsafe)`
+    /// See `databaseManager` documentation above — identical lifecycle guarantee
+    /// applies. All integration suites use `@Suite(.serialized)` to prevent
+    /// concurrent access to this shared connection pool reference.
     nonisolated(unsafe) static var connectionPool: ConnectionPool!
 
     // MARK: - Setup

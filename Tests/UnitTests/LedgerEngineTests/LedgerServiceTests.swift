@@ -65,13 +65,21 @@ private protocol EntitlementCheckProtocol: Sendable {
 }
 
 // MARK: - Mock Implementations
+//
+// Gate 2 compliance: All mock implementations below use Swift 6 actor isolation
+// or immutable struct patterns to achieve `Sendable` conformance without
+// `@unchecked Sendable`. This matches the established pattern in
+// AuthenticationTests, EntitlementTests, ValuationServiceTests, and
+// CSVParserTests — zero `@unchecked Sendable` annotations in the test suite.
 
-/// Mock transaction repository tracking all created transactions for assertions.
+/// Actor-based mock transaction repository tracking all created transactions
+/// for post-test assertions.
 ///
-/// Uses `@unchecked Sendable` because mutable tracking state (createdTransactions,
-/// storedTransactions, nextId) is mutated only within sequential test execution
-/// — no concurrent access occurs in practice.
-private final class MockTransactionRepo: TransactionRepoProtocol, @unchecked Sendable {
+/// Uses `actor` isolation to provide thread-safe mutable state access that
+/// satisfies Swift 6 strict concurrency checking (Gate 2) without
+/// `@unchecked Sendable`. All state mutations are automatically serialized
+/// by the actor runtime. Test assertions access state via `await`.
+private actor MockTransactionRepo: TransactionRepoProtocol {
     var createdTransactions: [Transaction] = []
     var storedTransactions: [UInt64: Transaction] = [:]
     var nextId: UInt64 = 1
@@ -130,11 +138,13 @@ private final class MockTransactionRepo: TransactionRepoProtocol, @unchecked Sen
     }
 }
 
-/// Mock position repository tracking all creates, lookups, and quantity updates.
+/// Actor-based mock position repository tracking all creates, lookups, and
+/// quantity updates for post-test assertions.
 ///
-/// Uses `@unchecked Sendable` because mutable tracking state is mutated only
-/// within sequential test execution — no concurrent access occurs in practice.
-private final class MockPositionRepo: PositionRepoProtocol, @unchecked Sendable {
+/// Uses `actor` isolation to provide thread-safe mutable state access that
+/// satisfies Swift 6 strict concurrency checking (Gate 2) without
+/// `@unchecked Sendable`. Test assertions access state via `await`.
+private actor MockPositionRepo: PositionRepoProtocol {
     var createdPositions: [Position] = []
     var positionsByKey: [String: Position] = [:]
     var updatedQuantities: [(id: UInt64, quantity: Decimal)] = []
@@ -185,14 +195,24 @@ private final class MockPositionRepo: PositionRepoProtocol, @unchecked Sendable 
     }
 }
 
-/// Mock entitlement checker with configurable per-test permission results.
+/// Immutable mock entitlement checker with configurable per-test permission results.
 ///
-/// Defaults to allowing all permissions (`defaultPermission = true`). Tests
-/// for unauthorized access set `defaultPermission = false` or configure
-/// specific keys in `permissionResults`.
-private final class MockEntitlementChecker: EntitlementCheckProtocol, @unchecked Sendable {
-    var permissionResults: [String: Bool] = [:]
-    var defaultPermission: Bool = true
+/// Uses a `struct` with `let` properties for natural `Sendable` conformance —
+/// all state is configured at initialization time, matching the closure-based
+/// mock pattern used in AuthenticationTests, EntitlementTests, and
+/// ValuationServiceTests. Zero `@unchecked Sendable` annotations.
+///
+/// Defaults to allowing all permissions (`defaultPermission: true`). Tests
+/// for unauthorized access pass `defaultPermission: false` at initialization
+/// or configure specific keys in `permissionResults`.
+private struct MockEntitlementChecker: EntitlementCheckProtocol, Sendable {
+    let permissionResults: [String: Bool]
+    let defaultPermission: Bool
+
+    init(permissionResults: [String: Bool] = [:], defaultPermission: Bool = true) {
+        self.permissionResults = permissionResults
+        self.defaultPermission = defaultPermission
+    }
 
     func checkPermission(
         userId: UInt64, accountGroupId: UInt64, permission: String
@@ -484,7 +504,7 @@ struct LedgerServiceTests {
         )
 
         // Verify transaction was created with correct properties
-        #expect(txRepo.createdTransactions.count == 1)
+        #expect(await txRepo.createdTransactions.count == 1)
         #expect(result.accountId == testAccountId)
         #expect(result.instrumentId == testInstrumentId)
         #expect(result.debitAmount == amount)
@@ -521,9 +541,9 @@ struct LedgerServiceTests {
         }
 
         // Verify zero DB writes — no transaction or position was created
-        #expect(txRepo.createdTransactions.isEmpty,
+        #expect(await txRepo.createdTransactions.isEmpty,
                 "No transaction should be written when entry is unbalanced")
-        #expect(posRepo.createdPositions.isEmpty,
+        #expect(await posRepo.createdPositions.isEmpty,
                 "No position should be written when entry is unbalanced")
     }
 
@@ -554,9 +574,9 @@ struct LedgerServiceTests {
         }
 
         // Verify zero DB writes
-        #expect(txRepo.createdTransactions.isEmpty,
+        #expect(await txRepo.createdTransactions.isEmpty,
                 "No transaction should be written for non-equity asset")
-        #expect(posRepo.createdPositions.isEmpty,
+        #expect(await posRepo.createdPositions.isEmpty,
                 "No position should be written for non-equity asset")
     }
 
@@ -577,7 +597,7 @@ struct LedgerServiceTests {
         )
 
         // Transaction was created successfully — no invalidAssetClass error
-        #expect(txRepo.createdTransactions.count == 1)
+        #expect(await txRepo.createdTransactions.count == 1)
         #expect(result.assetType == "equity")
     }
 
@@ -585,8 +605,7 @@ struct LedgerServiceTests {
 
     @Test("Post transaction without CREATE permission throws unauthorizedAccess")
     func testUnauthorizedTransactionRejected() async throws {
-        let entChecker = MockEntitlementChecker()
-        entChecker.defaultPermission = false  // Deny all permissions
+        let entChecker = MockEntitlementChecker(defaultPermission: false)  // Deny all permissions
         let (service, txRepo, _, _) = createTestService(entitlementChecker: entChecker)
 
         do {
@@ -609,7 +628,7 @@ struct LedgerServiceTests {
         }
 
         // Verify zero DB writes — entitlement rejected before any repository call
-        #expect(txRepo.createdTransactions.isEmpty,
+        #expect(await txRepo.createdTransactions.isEmpty,
                 "No transaction should be written without CREATE permission")
     }
 
@@ -625,8 +644,7 @@ struct LedgerServiceTests {
             restatementRefId: nil, createdAt: Date()
         ))
 
-        let entChecker = MockEntitlementChecker()
-        entChecker.defaultPermission = false  // Deny READ
+        let entChecker = MockEntitlementChecker(defaultPermission: false)  // Deny READ
         let (service, _, _, _) = createTestService(
             txRepo: txRepo, entitlementChecker: entChecker
         )
@@ -646,13 +664,12 @@ struct LedgerServiceTests {
     func testUnauthorizedPositionReadReturnsEmpty() async throws {
         let posRepo = MockPositionRepo()
         // Seed a position so there is data that COULD be returned
-        posRepo.seedPosition(Position(
+        await posRepo.seedPosition(Position(
             id: 1, accountId: testAccountId, instrumentId: testInstrumentId,
             quantity: Decimal(50), assetType: "equity"
         ))
 
-        let entChecker = MockEntitlementChecker()
-        entChecker.defaultPermission = false  // Deny READ
+        let entChecker = MockEntitlementChecker(defaultPermission: false)  // Deny READ
         let (service, _, _, _) = createTestService(
             posRepo: posRepo, entitlementChecker: entChecker
         )
@@ -709,7 +726,8 @@ struct LedgerServiceTests {
                 "Offsetting entry must negate the original quantity")
 
         // Verify original transaction was NOT modified (immutability)
-        let originalStored = txRepo.storedTransactions[original.id]
+        let storedTransactions = await txRepo.storedTransactions
+        let originalStored = storedTransactions[original.id]
         #expect(originalStored != nil, "Original transaction must still exist")
         #expect(originalStored?.quantity == Decimal(100),
                 "Original transaction quantity must be unchanged")
@@ -717,7 +735,7 @@ struct LedgerServiceTests {
                 "Original transaction's restatementRefId must remain nil")
 
         // Verify two transactions total (original + offsetting)
-        #expect(txRepo.createdTransactions.count == 2)
+        #expect(await txRepo.createdTransactions.count == 2)
     }
 
     @Test("Create restatement for nonexistent transaction throws error")
@@ -763,9 +781,10 @@ struct LedgerServiceTests {
         )
 
         // Verify a new position was created with correct properties
-        #expect(posRepo.createdPositions.count == 1,
+        let createdPositions = await posRepo.createdPositions
+        #expect(createdPositions.count == 1,
                 "A new position should be created when none exists")
-        let created = posRepo.createdPositions[0]
+        let created = createdPositions[0]
         #expect(created.accountId == testAccountId)
         #expect(created.instrumentId == testInstrumentId)
         #expect(created.quantity == Decimal(75))
@@ -776,7 +795,7 @@ struct LedgerServiceTests {
     func testPostTransactionUpdatesExistingPosition() async throws {
         let posRepo = MockPositionRepo()
         // Seed existing position with quantity 50 (simulates prior DB state)
-        posRepo.seedPosition(Position(
+        await posRepo.seedPosition(Position(
             id: 1, accountId: testAccountId, instrumentId: testInstrumentId,
             quantity: Decimal(50), assetType: "equity"
         ))
@@ -796,12 +815,13 @@ struct LedgerServiceTests {
         )
 
         // Verify quantity was updated: 50 (existing) + 30 (new) = 80
-        #expect(posRepo.updatedQuantities.count == 1,
+        let updatedQuantities = await posRepo.updatedQuantities
+        #expect(updatedQuantities.count == 1,
                 "Existing position quantity should be updated, not a new position created")
-        #expect(posRepo.updatedQuantities[0].id == 1)
-        #expect(posRepo.updatedQuantities[0].quantity == Decimal(80))
+        #expect(updatedQuantities[0].id == 1)
+        #expect(updatedQuantities[0].quantity == Decimal(80))
         // Verify no NEW position was created (the existing one was updated)
-        #expect(posRepo.createdPositions.isEmpty,
+        #expect(await posRepo.createdPositions.isEmpty,
                 "No new position should be created when one already exists")
     }
 
@@ -809,8 +829,7 @@ struct LedgerServiceTests {
 
     @Test("Entitlement check happens before asset class guard")
     func testValidationOrderEntitlementFirst() async throws {
-        let entChecker = MockEntitlementChecker()
-        entChecker.defaultPermission = false  // Deny all permissions
+        let entChecker = MockEntitlementChecker(defaultPermission: false)  // Deny all permissions
         let (service, _, _, _) = createTestService(entitlementChecker: entChecker)
 
         // Trigger BOTH: denied permission AND non-equity asset type.

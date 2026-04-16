@@ -264,6 +264,14 @@ public struct AdminView: View {
         }
         .formStyle(.grouped)
         .navigationTitle("Administration")
+        .toolbar {
+            ToolbarItem(placement: .automatic) {
+                Text("Admin User #\(currentUserId)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .accessibilityLabel("Logged in as admin user \(currentUserId)")
+            }
+        }
         .task {
             await loadData()
         }
@@ -546,10 +554,6 @@ public struct AdminView: View {
 
             // Refresh the account groups list so the new group appears in the picker.
             accountGroups = (try? await accountGroupService.listGroups()) ?? accountGroups
-        } catch let appError as AppError where appError == .accountNotFound {
-            // Explicit handling of AppError.accountNotFound — thrown when the
-            // referenced account group cannot be found during validation.
-            groupCreationMessage = "Error: Account group not found."
         } catch {
             // Generic error handler for unexpected failures (DB connectivity, etc.).
             groupCreationMessage = "Error: \(error.localizedDescription)"

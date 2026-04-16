@@ -28,9 +28,10 @@ import Shared
 /// ## Swift 6 Strict Concurrency (Gate 2)
 ///
 /// Declared as `public final class` with a single immutable `let` property
-/// (`accountGroupRepository: AccountGroupRepository`) which itself conforms to
-/// `Sendable`. No mutable state exists. All methods are `async throws`, fully
-/// compatible with structured concurrency. Zero `@unchecked Sendable` annotations.
+/// (`accountGroupRepository: any AccountGroupServiceRepositoryProtocol`) which
+/// is an existential of a `Sendable`-constrained protocol. No mutable state
+/// exists. All methods are `async throws`, fully compatible with structured
+/// concurrency. Zero `@unchecked Sendable` annotations.
 ///
 /// ## Rule 7 — Batch Memory Cap
 ///
@@ -64,7 +65,13 @@ public final class AccountGroupService: Sendable {
     /// Injected via ``DependencyContainer`` at application startup. Provides
     /// `findById`, `findAll`, `create`, `delete`, `update`, `findByName`,
     /// `findByIds`, and `count` methods against the MySQL `account_groups` table.
-    private let accountGroupRepository: AccountGroupRepository
+    ///
+    /// Typed as `any AccountGroupServiceRepositoryProtocol` to support dependency
+    /// injection of both the production ``AccountGroupRepository`` and lightweight
+    /// mock implementations in unit tests — consistent with the protocol-based DI
+    /// pattern used by ``EntitlementService`` (with ``EntitlementRepositoryProtocol``)
+    /// and ``AuthenticationService`` (with ``UserRepositoryProtocol``).
+    private let accountGroupRepository: any AccountGroupServiceRepositoryProtocol
 
     // MARK: - Initializer
 
@@ -72,8 +79,8 @@ public final class AccountGroupService: Sendable {
     ///
     /// - Parameter accountGroupRepository: The repository for account group database
     ///   operations. Injected by ``DependencyContainer`` at application startup.
-    ///   Must conform to `Sendable`.
-    public init(accountGroupRepository: AccountGroupRepository) {
+    ///   Must conform to ``AccountGroupServiceRepositoryProtocol`` and `Sendable`.
+    public init(accountGroupRepository: any AccountGroupServiceRepositoryProtocol) {
         self.accountGroupRepository = accountGroupRepository
     }
 

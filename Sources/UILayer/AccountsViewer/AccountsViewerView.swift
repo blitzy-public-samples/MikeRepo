@@ -955,8 +955,10 @@ public struct AccountsViewerView: View {
             // Clear cached positions for the account to force re-fetch.
             positionsMap.removeValue(forKey: account.id)
         } catch {
-            // Silently handle single-account valuation errors —
-            // the cached value remains unchanged.
+            // Single-account valuation refresh failed — the cached value
+            // remains unchanged so the row displays stale-but-valid data.
+            // Log the error for diagnostics without disrupting the user.
+            print("[AccountsViewer] Valuation refresh failed for account \(account.id): \(error.localizedDescription)")
         }
     }
 

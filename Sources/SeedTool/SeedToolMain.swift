@@ -224,6 +224,12 @@ struct SeedToolMain {
         // Pre-computed bcrypt hash for development password "admin123".
         // Generated via: BCryptSwift.hashString("admin123", rounds: 12)
         // Using pre-computed hash because SeedTool does not depend on RBAC module.
+        //
+        // ⚠️ DEVELOPMENT ONLY — This password and hash are intended exclusively
+        // for local development and testing seed data. Do NOT use this password
+        // or hash in any production environment. Production users must create
+        // accounts through the AdminView UI with strong, unique passwords that
+        // are hashed at runtime via PasswordHasher.
         let devPasswordHash = "$2b$12$LJ3m4ys3Lk0TSwMCfVCZxOYd5cF.qK5lQvFNr3yVDJsFqXBkqJW2e"
 
         let sampleUsers: [User] = [

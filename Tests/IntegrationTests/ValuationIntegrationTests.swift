@@ -754,13 +754,16 @@ struct ValuationIntegrationTests {
 
         // Expected NAV:
         // Equity value: 100 × ((195 + 197) / 2) = 100 × 196 = 19600
-        // Cash: extractCashBalance returns 5000 × cashPrice(1.0) = 5000
-        //        computeNAV adds cashBalance × cashPrice(1.0) = 5000
+        // Cash balance: 5000 (quantity) × cashPrice(1.0) = 5000
         // Total NAV = 19600 + 5000 = 24600.00
+        //
+        // Note: cashPrice is applied once when extracting the cash balance
+        // (quantity × cashPrice). The resulting balance is added directly
+        // to the equity value — no second multiplication by cashPrice.
         let equityMidpoint = Decimal.midpoint(bid: Decimal(195), ask: Decimal(197))
         let equityValue = Decimal(100) * equityMidpoint
         let cashBalance = Decimal(5000) * AppConstants.cashPrice
-        let expectedNAV = equityValue + cashBalance * AppConstants.cashPrice
+        let expectedNAV = equityValue + cashBalance
 
         #expect(equityMidpoint == Decimal(196), "Equity midpoint should be 196")
         #expect(AppConstants.cashPrice == Decimal(1), "Cash price must be fixed at 1.00")
