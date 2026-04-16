@@ -130,6 +130,27 @@ public enum AppError: Error, Sendable, Equatable {
     /// Consumers: All repository classes in the Persistence module.
     case dataAccessFailed(String)
 
+    // MARK: - Job Scheduler
+
+    /// Job lookup failure.
+    ///
+    /// Thrown when a requested job identifier does not correspond to any
+    /// existing record in the in-memory job store. Used by
+    /// ``JobSchedulerService/executeJob(id:userId:)`` when the caller
+    /// supplies a job ID that has not been created.
+    ///
+    /// Consumers: ``JobSchedulerService``.
+    case jobNotFound
+
+    /// Invalid job parameters.
+    ///
+    /// Thrown when a job's configuration parameters are invalid or incomplete
+    /// for the requested job type. For example, an ingestion job that is
+    /// missing the required `sourceFilePath` will trigger this error.
+    ///
+    /// Consumers: ``JobSchedulerService``.
+    case invalidJobParameters(String)
+
     // MARK: - Persistence Infrastructure
 
     /// Database migration failure.

@@ -37,16 +37,17 @@ import Shared
 // MARK: - Report Field Configuration
 
 /// Identifiers and display names for account fields available in report generation.
-/// Each `key` corresponds to a column identifier used by `ReportGenerator` for CSV export.
+/// Each `key` corresponds exactly to a case in `ReportGenerator.extractFieldValue()`
+/// to ensure the CSV report produces correct column values.
 private let availableReportFields: [(key: String, displayName: String)] = [
     ("accountName", "Account Name"),
     ("accountId", "Account ID"),
     ("accountType", "Account Type"),
-    ("accountGroup", "Account Group"),
-    ("valuationAmount", "Valuation Amount"),
-    ("valueDate", "Value Date"),
-    ("timezone", "Timezone"),
-    ("status", "Status")
+    ("accountGroupId", "Account Group"),
+    ("cachedValuationAmount", "Valuation Amount"),
+    ("cachedValueDate", "Value Date"),
+    ("valuationTimezone", "Timezone"),
+    ("accountStatus", "Status")
 ]
 
 /// Available CSV ingestion type descriptors for the type selector picker.
@@ -168,9 +169,9 @@ public final class JobSchedulerViewModel {
     /// executes via `JobSchedulerService.executeJob(id:userId:)`. On completion,
     /// refreshes the job list and resets the form.
     ///
-    /// RBAC verification (Rule 4) is performed via `EntitlementService.checkPermission`
-    /// as a UI-level defense-in-depth gate. The service layer provides authoritative
-    /// enforcement during job execution.
+    /// RBAC verification (Rule 4) is enforced authoritatively at the service layer.
+    /// `ReportGenerator` delegates to `AccountService`, which pre-filters results
+    /// by the user's entitled account groups — zero records for unauthorized groups.
     func createAndTriggerReportJob() async {
         // Parse account IDs from comma-separated text input
         parseAccountIds()
@@ -187,22 +188,13 @@ public final class JobSchedulerViewModel {
             return
         }
 
-        // RBAC gate (Rule 4): verify user has READ permission before report creation.
-        // Uses the first selected account ID as a proxy for the account group context.
-        // The service layer performs authoritative per-group enforcement during execution.
-        if let firstId = selectedAccountIds.first {
-            let hasPermission = await entitlementService.checkPermission(
-                userId: userId,
-                accountGroupId: firstId,
-                permission: "READ"
-            )
-            if !hasPermission {
-                // Rule 4: inform user without throwing an error exception
-                errorMessage = "Insufficient permissions for the selected accounts. "
-                    + "Verify your READ access to the relevant account groups."
-                return
-            }
-        }
+        // Rule 4 — Entitlement Enforcement:
+        // RBAC is enforced authoritatively at the service layer. ReportGenerator
+        // delegates account fetching to AccountService, which pre-filters results
+        // by the user's entitled account groups. Users without READ access to an
+        // account group receive zero records for that group — never an error.
+        // A UI-level pre-check is not feasible here because the text input provides
+        // only raw account IDs, not Account objects with accountGroupId properties.
 
         isLoading = true
         errorMessage = nil
@@ -355,13 +347,16 @@ public final class JobSchedulerViewModel {
 
     /// Maps `AppError` cases to user-friendly error messages for the alert.
     ///
-    /// Handles `accountNotFound` and `unauthorizedAccess` explicitly per the
-    /// schema's `members_accessed` requirements. All other cases receive a
-    /// generic description.
+    /// Handles job-specific and access-control error cases explicitly. All
+    /// other cases receive a generic description.
     private func handleAppError(_ error: AppError) {
         switch error {
+        case .jobNotFound:
+            errorMessage = "The specified job was not found."
+        case .invalidJobParameters(let detail):
+            errorMessage = "Invalid job parameters: \(detail)"
         case .accountNotFound:
-            errorMessage = "The specified job or account was not found."
+            errorMessage = "The specified account was not found."
         case .unauthorizedAccess:
             errorMessage = "You do not have permission to perform this operation."
         default:
