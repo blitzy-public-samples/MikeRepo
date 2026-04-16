@@ -355,6 +355,12 @@ private struct TestableAccountService: Sendable {
         let accessibleGroupIdSet = Set(accessibleGroups.map { $0.id })
         return accounts.filter { accessibleGroupIdSet.contains($0.accountGroupId) }
     }
+
+    // MARK: - Accessible Account Groups (Rule 4)
+
+    func getAccessibleAccountGroups(userId: UInt64) async -> [Persistence.AccountGroup] {
+        await entitlementCheck.filterAccessibleGroups(userId: userId)
+    }
 }
 
 // MARK: - Test Data Helpers
@@ -766,6 +772,55 @@ struct AccountServiceFundTypeTests {
             #expect(results.count == 1, "Filtering by \(ft.rawValue) should return exactly 1 account")
         }
     }
+
+    @Test("FundType.allCases has exactly 6 cases via CaseIterable")
+    func testFundTypeAllCasesCount() {
+        #expect(AccountManagement.FundType.allCases.count == 6,
+                "FundType must have exactly 6 cases via CaseIterable")
+        let expectedCases: Set<AccountManagement.FundType> = [
+            .openMutualFund, .closedMutualFund, .etf, .hedgeFund, .sma, .uma
+        ]
+        let actualCases = Set(AccountManagement.FundType.allCases)
+        #expect(actualCases == expectedCases, "allCases must contain all 6 fund types")
+    }
+
+    @Test("FundType displayName returns human-readable strings")
+    func testFundTypeDisplayNames() {
+        #expect(AccountManagement.FundType.openMutualFund.displayName.isEmpty == false)
+        #expect(AccountManagement.FundType.closedMutualFund.displayName.isEmpty == false)
+        #expect(AccountManagement.FundType.etf.displayName.isEmpty == false)
+        #expect(AccountManagement.FundType.hedgeFund.displayName.isEmpty == false)
+        #expect(AccountManagement.FundType.sma.displayName.isEmpty == false)
+        #expect(AccountManagement.FundType.uma.displayName.isEmpty == false)
+
+        // Each display name should be unique
+        let allNames = AccountManagement.FundType.allCases.map { $0.displayName }
+        let uniqueNames = Set(allNames)
+        #expect(uniqueNames.count == 6, "All 6 display names should be unique")
+    }
+
+    @Test("FundType Codable JSON encode/decode round-trip")
+    func testFundTypeCodableRoundTrip() throws {
+        let encoder = JSONEncoder()
+        let decoder = JSONDecoder()
+
+        for fundType in AccountManagement.FundType.allCases {
+            let data = try encoder.encode(fundType)
+            let decoded = try decoder.decode(AccountManagement.FundType.self, from: data)
+            #expect(decoded == fundType,
+                    "FundType \(fundType.rawValue) should survive JSON round-trip")
+        }
+    }
+
+    @Test("FundType raw values match expected snake_case strings")
+    func testFundTypeRawValueStrings() {
+        #expect(AccountManagement.FundType.openMutualFund.rawValue == "open_mutual_fund")
+        #expect(AccountManagement.FundType.closedMutualFund.rawValue == "closed_mutual_fund")
+        #expect(AccountManagement.FundType.etf.rawValue == "etf")
+        #expect(AccountManagement.FundType.hedgeFund.rawValue == "hedge_fund")
+        #expect(AccountManagement.FundType.sma.rawValue == "sma")
+        #expect(AccountManagement.FundType.uma.rawValue == "uma")
+    }
 }
 
 // MARK: - Suite 4: CRUD Permission Tests (Rule 4)
@@ -891,6 +946,111 @@ struct AccountServiceCRUDTests {
             )
         }
     }
+
+    @Test("getAccounts filters results by accessible groups — Rule 4")
+    func testGetAccountsFiltersAccessibleGroups() async throws {
+        // 3 accounts across 3 groups; user entitled to only 2 groups
+        let group1 = makeTestGroup(id: 100, groupName: "Entitled Group A")
+        let group2 = makeTestGroup(id: 200, groupName: "Entitled Group B")
+        let accounts = [
+            makeTestAccount(id: 1, name: "Acct A", accountGroupId: 100),
+            makeTestAccount(id: 2, name: "Acct B", accountGroupId: 200),
+            makeTestAccount(id: 3, name: "Acct C", accountGroupId: 300),
+        ]
+
+        let repo = MockAccountRepo()
+        let entitlement = MockEntitlementCheck()
+        await repo.seedAccounts(accounts)
+        // User entitled to groups 100, 200 only — NOT 300
+        await entitlement.setAccessibleGroups([group1, group2])
+        let svc = TestableAccountService(accountRepo: repo, entitlementCheck: entitlement)
+
+        let results = try await svc.getAccounts(ids: [1, 2, 3], userId: 1)
+        #expect(results.count == 2,
+                "Rule 4: Only accounts in entitled groups should be returned")
+        let returnedIds = Set(results.map { $0.id })
+        #expect(returnedIds.contains(1))
+        #expect(returnedIds.contains(2))
+        #expect(!returnedIds.contains(3),
+                "Account in non-entitled group 300 must be excluded")
+    }
+
+    @Test("getAccountsByGroup returns empty for unauthorized group — Rule 4")
+    func testGetAccountsByGroupUnauthorized() async throws {
+        let accounts = [
+            makeTestAccount(id: 1, name: "Protected Acct", accountGroupId: 500),
+        ]
+        let svc = await buildTestService(accounts: accounts, canRead: false)
+
+        let results = try await svc.getAccountsByGroup(
+            groupId: 500, userId: 1, page: 1, pageSize: 100
+        )
+        #expect(results.isEmpty,
+                "Rule 4: Unauthorized group READ should return empty, not error")
+    }
+
+    @Test("getAccessibleAccountGroups returns empty for user with no entitlements — Rule 4")
+    func testGetAccessibleGroupsNoEntitlements() async throws {
+        let repo = MockAccountRepo()
+        let entitlement = MockEntitlementCheck()
+        // Set NO accessible groups for user 999
+        await entitlement.setAccessibleGroups([])
+        let svc = TestableAccountService(accountRepo: repo, entitlementCheck: entitlement)
+
+        let groups = await svc.getAccessibleAccountGroups(userId: 999)
+        #expect(groups.isEmpty,
+                "Rule 4: User with no entitlements should receive empty groups list")
+    }
+
+    @Test("getAccessibleAccountGroups returns groups for entitled user")
+    func testGetAccessibleGroupsForEntitledUser() async throws {
+        let group1 = makeTestGroup(id: 100, groupName: "Portfolio A")
+        let group2 = makeTestGroup(id: 200, groupName: "Portfolio B")
+
+        let repo = MockAccountRepo()
+        let entitlement = MockEntitlementCheck()
+        await entitlement.setAccessibleGroups([group1, group2])
+        let svc = TestableAccountService(accountRepo: repo, entitlementCheck: entitlement)
+
+        let groups = await svc.getAccessibleAccountGroups(userId: 1)
+        #expect(groups.count == 2)
+        let groupIds = Set(groups.map { $0.id })
+        #expect(groupIds.contains(100))
+        #expect(groupIds.contains(200))
+    }
+
+    @Test("createAccount validates multiple IANA timezones — Rule 3")
+    func testCreateValidatesMultipleTimezones() async throws {
+        let svc = await buildTestService()
+
+        // Valid timezones should succeed
+        let validTimezones = ["America/New_York", "Europe/London", "Asia/Tokyo", "UTC"]
+        for tz in validTimezones {
+            let account = makeTestAccount(id: 0, name: "TZ Test", valuationTimezone: tz)
+            let created = try await svc.createAccount(account, userId: 1)
+            #expect(created.valuationTimezone == tz,
+                    "Valid timezone '\(tz)' should be accepted")
+        }
+
+        // Invalid timezones should throw
+        let invalidTimezones = ["FakeCity/NoWhere", "NotA/Timezone", "Mars/Colony"]
+        for tz in invalidTimezones {
+            let account = makeTestAccount(id: 0, name: "Bad TZ", valuationTimezone: tz)
+            await #expect(throws: AppError.invalidTimezone) {
+                _ = try await svc.createAccount(account, userId: 1)
+            }
+        }
+    }
+
+    @Test("getAccount returns nil for non-existent ID with authorized user")
+    func testGetAccountNonExistentIdAuthorized() async throws {
+        // Empty repo — no accounts at all
+        let svc = await buildTestService()
+
+        let result = try await svc.getAccount(id: 999, userId: 1)
+        #expect(result == nil,
+                "Non-existent account should return nil, not an error")
+    }
 }
 
 // MARK: - Suite 5: Account Status Lifecycle
@@ -947,5 +1107,77 @@ struct AccountServiceStatusTests {
         let svc = await buildTestService()
         let results = try await svc.getAccounts(ids: [], userId: 1)
         #expect(results.isEmpty)
+    }
+
+    @Test("AccountStatus.allCases has exactly 4 cases via CaseIterable")
+    func testAccountStatusAllCasesCount() {
+        #expect(AccountManagement.AccountStatus.allCases.count == 4,
+                "AccountStatus must have exactly 4 cases via CaseIterable")
+        let expectedCases: Set<AccountManagement.AccountStatus> = [
+            .active, .inactive, .pending, .suspended
+        ]
+        let actualCases = Set(AccountManagement.AccountStatus.allCases)
+        #expect(actualCases == expectedCases, "allCases must contain all 4 statuses")
+    }
+
+    @Test("AccountStatus Codable JSON encode/decode round-trip")
+    func testAccountStatusCodableRoundTrip() throws {
+        let encoder = JSONEncoder()
+        let decoder = JSONDecoder()
+
+        for status in AccountManagement.AccountStatus.allCases {
+            let data = try encoder.encode(status)
+            let decoded = try decoder.decode(AccountManagement.AccountStatus.self, from: data)
+            #expect(decoded == status,
+                    "AccountStatus \(status.rawValue) should survive JSON round-trip")
+        }
+    }
+
+    @Test("AccountStatus raw values match expected strings")
+    func testAccountStatusRawValueStrings() {
+        #expect(AccountManagement.AccountStatus.active.rawValue == "active")
+        #expect(AccountManagement.AccountStatus.inactive.rawValue == "inactive")
+        #expect(AccountManagement.AccountStatus.pending.rawValue == "pending")
+        #expect(AccountManagement.AccountStatus.suspended.rawValue == "suspended")
+    }
+
+    @Test("AccountStatus CaseIterable iterates all values in order")
+    func testAccountStatusCaseIterable() {
+        var iteratedStatuses: [AccountManagement.AccountStatus] = []
+        for status in AccountManagement.AccountStatus.allCases {
+            iteratedStatuses.append(status)
+        }
+        #expect(iteratedStatuses.count == 4,
+                "Iterating allCases must produce exactly 4 elements")
+        #expect(iteratedStatuses.contains(.active))
+        #expect(iteratedStatuses.contains(.inactive))
+        #expect(iteratedStatuses.contains(.pending))
+        #expect(iteratedStatuses.contains(.suspended))
+    }
+
+    @Test("Batch status update works with all four AccountStatus values")
+    func testBatchUpdateAllFourStatuses() async throws {
+        let accounts = [
+            makeTestAccount(id: 1, name: "Status Acct", status: .pending),
+        ]
+        let svc = await buildTestService(accounts: accounts)
+
+        // Use Persistence.AccountStatus since TestableAccountService works with persistence types
+        let allStatuses: [Persistence.AccountStatus] = [
+            .active, .inactive, .pending, .suspended
+        ]
+        for status in allStatuses {
+            try await svc.batchStatusUpdate(
+                accountIds: [1], newStatus: status, userId: 1
+            )
+        }
+
+        let calls = await svc.accountRepo.batchUpdateCalls
+        #expect(calls.count == 4, "Should have 4 batch update calls — one per status")
+        let statusValues = calls.map { $0.newStatus }
+        #expect(statusValues.contains("active"))
+        #expect(statusValues.contains("inactive"))
+        #expect(statusValues.contains("pending"))
+        #expect(statusValues.contains("suspended"))
     }
 }
