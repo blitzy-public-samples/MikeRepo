@@ -43,10 +43,10 @@ import AccountManagement
 ///
 /// ## Environment Variables
 ///
-/// - `MYSQL_USER`: MySQL username (default: `"root"`)
-/// - `MYSQL_PASSWORD`: MySQL password (default: `""`)
-/// - `MYSQL_DATABASE`: Database name (default: `"wealth_ledger"`)
-/// - `MYSQL_HOST`: MySQL hostname (default: `"localhost"`)
+/// - `DB_USERNAME`: MySQL username (default: `"wealthledger"`)
+/// - `DB_PASSWORD`: MySQL password (default: `"wealthledger_pass"`)
+/// - `DB_NAME`: Database name (default: `"wealth_ledger"`)
+/// - `DB_HOST`: MySQL hostname (default: `"localhost"`)
 ///
 /// ## Concurrency Safety (Gate 2)
 ///
@@ -87,12 +87,14 @@ struct SeedToolMain {
         }
 
         // Parse database credentials from environment variables with safe defaults.
+        // Uses the same DB_* naming convention as WealthLedgerApp.swift and
+        // Scripts/setup_database.sh for credential consistency across all targets.
         // All defaults target localhost MySQL — Rule 9 (Offline Runtime): zero
         // external network calls permitted at runtime.
-        let username = ProcessInfo.processInfo.environment["MYSQL_USER"] ?? "root"
-        let password = ProcessInfo.processInfo.environment["MYSQL_PASSWORD"] ?? ""
-        let database = ProcessInfo.processInfo.environment["MYSQL_DATABASE"] ?? "wealth_ledger"
-        let hostname = ProcessInfo.processInfo.environment["MYSQL_HOST"] ?? "localhost"
+        let username = ProcessInfo.processInfo.environment["DB_USERNAME"] ?? "wealthledger"
+        let password = ProcessInfo.processInfo.environment["DB_PASSWORD"] ?? "wealthledger_pass"
+        let database = ProcessInfo.processInfo.environment["DB_NAME"] ?? "wealth_ledger"
+        let hostname = ProcessInfo.processInfo.environment["DB_HOST"] ?? "localhost"
 
         // Initialize DatabaseManager — this creates the connection pool and event
         // loop group but does NOT establish a database connection yet.
@@ -114,55 +116,79 @@ struct SeedToolMain {
             try await manager.initialize()
             print("✅ Database initialized and migrations applied.")
 
-            // Step 2 — Generate synthetic NYSE equity data (Rule 6, Rule 9).
-            // SyntheticDataGenerator produces at least 500 records with unique
-            // tickers (3-5 uppercase letters), realistic company names, and four
-            // stored price fields using exact Decimal arithmetic. All data is
-            // generated algorithmically with zero external network calls.
-            print("📊 Generating synthetic NYSE equity data...")
-            let generator = SyntheticDataGenerator()
-            let marketDate = Date()
-            let referenceRecords = generator.generate(marketDate: marketDate)
-            print("✅ Generated \(referenceRecords.count) synthetic securities.")
-
-            // Step 3 — Verify Rule 6 compliance: at least 500 records with all
-            // six price fields non-null and non-zero. SyntheticDataGenerator
-            // guarantees non-null/non-zero prices by construction, so we only
-            // need to verify the count threshold.
-            guard referenceRecords.count >= 500 else {
-                print("❌ ERROR: Generated only \(referenceRecords.count) records. Minimum required: 500 (Rule 6).")
-                try? await manager.shutdown()
-                throw AppError.migrationFailed
-            }
-
-            // Step 4 — Convert from ReferenceDataService.ReferenceData to
-            // Persistence.ReferenceData. This mapping is necessary because each
-            // module defines its own ReferenceData type to avoid circular module
-            // dependencies. The Persistence type is required by
-            // ReferenceDataRepository.bulkInsert().
-            let persistenceRecords: [Persistence.ReferenceData] = referenceRecords.map { record in
-                Persistence.ReferenceData(
-                    id: record.id,
-                    ticker: record.ticker,
-                    name: record.name,
-                    sodBid: record.sodBid,
-                    sodAsk: record.sodAsk,
-                    eodBid: record.eodBid,
-                    eodAsk: record.eodAsk,
-                    marketDate: record.marketDate
-                )
-            }
-
-            // Step 5 — Insert via ReferenceDataRepository with batch processing.
-            // bulkInsert() internally processes in batches of AppConstants.batchSize
-            // (1,000) records per batch to comply with Rule 7 (Batch Memory Cap).
+            // Step 2 — Check for existing reference data (idempotency guard).
+            // If reference data already exists and the --force flag was not provided,
+            // skip generation and insertion with an informative message. This prevents
+            // fatal crashes from duplicate unique key violations on re-runs.
             let referenceDataRepo = ReferenceDataRepository(pool: manager.pool)
-            print("💾 Inserting \(persistenceRecords.count) records in batches of \(AppConstants.batchSize)...")
-            try await referenceDataRepo.bulkInsert(persistenceRecords)
-            let totalCount = try await referenceDataRepo.count()
-            print("✅ reference_data table now contains \(totalCount) records.")
+            let existingCount = try await referenceDataRepo.count()
+            let shouldForce = CommandLine.arguments.contains("--force")
 
-            // Step 6 — Optionally seed sample users, groups, and accounts.
+            if existingCount > 0 && !shouldForce {
+                print("ℹ️  reference_data table already contains \(existingCount) records.")
+                print("   Skipping reference data seeding (data exists from a previous run).")
+                print("   Use --force to delete existing data and re-seed.")
+            } else {
+                // If --force is specified and data exists, delete existing reference
+                // data before re-seeding. Uses DELETE (not TRUNCATE) to respect FK
+                // constraints from the positions table. If positions reference existing
+                // reference data, the DELETE will fail with a helpful FK error rather
+                // than silently truncating.
+                if existingCount > 0 && shouldForce {
+                    print("⚠️  --force specified. Deleting \(existingCount) existing reference data records...")
+                    try await referenceDataRepo.deleteAll()
+                    print("✅ Existing reference data deleted.")
+                }
+
+                // Step 3 — Generate synthetic NYSE equity data (Rule 6, Rule 9).
+                // SyntheticDataGenerator produces at least 500 records with unique
+                // tickers (3-5 uppercase letters), realistic company names, and four
+                // stored price fields using exact Decimal arithmetic. All data is
+                // generated algorithmically with zero external network calls.
+                print("📊 Generating synthetic NYSE equity data...")
+                let generator = SyntheticDataGenerator()
+                let marketDate = Date()
+                let referenceRecords = generator.generate(marketDate: marketDate)
+                print("✅ Generated \(referenceRecords.count) synthetic securities.")
+
+                // Step 4 — Verify Rule 6 compliance: at least 500 records with all
+                // six price fields non-null and non-zero. SyntheticDataGenerator
+                // guarantees non-null/non-zero prices by construction, so we only
+                // need to verify the count threshold.
+                guard referenceRecords.count >= 500 else {
+                    print("❌ ERROR: Generated only \(referenceRecords.count) records. Minimum required: 500 (Rule 6).")
+                    try? await manager.shutdown()
+                    throw AppError.migrationFailed
+                }
+
+                // Step 5 — Convert from ReferenceDataService.ReferenceData to
+                // Persistence.ReferenceData. This mapping is necessary because each
+                // module defines its own ReferenceData type to avoid circular module
+                // dependencies. The Persistence type is required by
+                // ReferenceDataRepository.bulkInsert().
+                let persistenceRecords: [Persistence.ReferenceData] = referenceRecords.map { record in
+                    Persistence.ReferenceData(
+                        id: record.id,
+                        ticker: record.ticker,
+                        name: record.name,
+                        sodBid: record.sodBid,
+                        sodAsk: record.sodAsk,
+                        eodBid: record.eodBid,
+                        eodAsk: record.eodAsk,
+                        marketDate: record.marketDate
+                    )
+                }
+
+                // Step 6 — Insert via ReferenceDataRepository with batch processing.
+                // bulkInsert() internally processes in batches of AppConstants.batchSize
+                // (1,000) records per batch to comply with Rule 7 (Batch Memory Cap).
+                print("💾 Inserting \(persistenceRecords.count) records in batches of \(AppConstants.batchSize)...")
+                try await referenceDataRepo.bulkInsert(persistenceRecords)
+                let totalCount = try await referenceDataRepo.count()
+                print("✅ reference_data table now contains \(totalCount) records.")
+            }
+
+            // Step 7 — Optionally seed sample users, groups, and accounts.
             // Only activated when the --seed-samples CLI flag is present.
             let shouldSeedSamples = CommandLine.arguments.contains("--seed-samples")
             if shouldSeedSamples {
@@ -357,12 +383,13 @@ struct SeedToolMain {
         print("")
         print("Options:")
         print("  --seed-samples    Also seed sample users, account groups, and accounts")
+        print("  --force           Delete existing reference data and re-seed from scratch")
         print("  --help            Show this help message")
         print("")
         print("Environment variables:")
-        print("  MYSQL_USER        MySQL username (default: root)")
-        print("  MYSQL_PASSWORD    MySQL password (default: empty)")
-        print("  MYSQL_DATABASE    Database name (default: wealth_ledger)")
-        print("  MYSQL_HOST        MySQL hostname (default: localhost)")
+        print("  DB_USERNAME       MySQL username (default: wealthledger)")
+        print("  DB_PASSWORD       MySQL password (default: wealthledger_pass)")
+        print("  DB_NAME           Database name (default: wealth_ledger)")
+        print("  DB_HOST           MySQL hostname (default: localhost)")
     }
 }

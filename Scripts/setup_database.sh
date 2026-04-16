@@ -172,7 +172,21 @@ if [ "$MIGRATION_COUNT" -eq 0 ]; then
 fi
 echo "✓ Found ${MIGRATION_COUNT} migration file(s)"
 
-# --- 3.3 Execute All Migration Scripts in Strict Numerical Order ---
+# --- 3.3 Create Migration Tracking Table ---
+# Mirrors the _migrations tracking table created by the Swift MigrationManager
+# (Sources/Persistence/MigrationManager.swift). Both the shell script and the
+# Swift code use the same tracking table to guarantee idempotent migration
+# execution regardless of which entry point runs first.
+echo "  Ensuring migration tracking table exists..."
+mysql -u "${DB_USER}" -p"${DB_PASSWORD}" "${DB_NAME}" -e \
+    "CREATE TABLE IF NOT EXISTS _migrations (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        filename VARCHAR(255) UNIQUE NOT NULL,
+        applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );" 2>&1
+echo "✓ Migration tracking table ready"
+
+# --- 3.4 Execute All Migration Scripts in Strict Numerical Order ---
 # The sort command guarantees execution order: 001 → 002 → ... → 008.
 # This ordering is critical because:
 #   001_create_users.sql         — no dependencies
@@ -183,21 +197,43 @@ echo "✓ Found ${MIGRATION_COUNT} migration file(s)"
 #   006_create_positions.sql     — FKs to accounts (004), reference_data (005)
 #   007_create_transactions.sql  — FKs to accounts (004), reference_data (005), self-ref
 #   008_create_indexes.sql       — all 7 tables must exist first
+#
+# Each migration is checked against the _migrations tracking table before
+# execution. Already-applied migrations are skipped, making this script
+# fully idempotent and safe to re-run.
 echo ""
 echo "Running database migrations..."
 echo "=============================="
 
 APPLIED_COUNT=0
+SKIPPED_COUNT=0
 for migration in $(find "$MIGRATIONS_DIR" -maxdepth 1 -name "*.sql" -type f | sort); do
     MIGRATION_NAME="$(basename "$migration")"
+
+    # Check if this migration has already been applied by querying the
+    # _migrations tracking table. This mirrors the skip logic in the Swift
+    # MigrationManager.fetchAppliedMigrations(on:) method.
+    ALREADY_APPLIED=$(mysql -u "${DB_USER}" -p"${DB_PASSWORD}" "${DB_NAME}" -N -e \
+        "SELECT COUNT(*) FROM _migrations WHERE filename = '${MIGRATION_NAME}';" 2>/dev/null)
+
+    if [ "$ALREADY_APPLIED" -gt 0 ]; then
+        echo "  Skipping (already applied): ${MIGRATION_NAME}"
+        SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
+        continue
+    fi
+
     echo "  Executing: ${MIGRATION_NAME}..."
     mysql -u "${DB_USER}" -p"${DB_PASSWORD}" "${DB_NAME}" < "$migration" 2>&1
+
+    # Record the migration as applied in the tracking table.
+    mysql -u "${DB_USER}" -p"${DB_PASSWORD}" "${DB_NAME}" -e \
+        "INSERT INTO _migrations (filename) VALUES ('${MIGRATION_NAME}');" 2>&1
     echo "    ✓ ${MIGRATION_NAME} applied successfully"
     APPLIED_COUNT=$((APPLIED_COUNT + 1))
 done
 
 echo "=============================="
-echo "✓ All ${APPLIED_COUNT} migrations applied successfully"
+echo "✓ Migrations complete — ${APPLIED_COUNT} applied, ${SKIPPED_COUNT} skipped (already applied)"
 
 # =============================================================
 # Phase 4: Verification

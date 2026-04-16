@@ -256,6 +256,25 @@ public final class ReferenceDataRepository: RepositoryProtocol, Sendable {
         }
     }
 
+    /// Deletes all reference data records from the table.
+    ///
+    /// Used by `SeedTool` with the `--force` flag to clear existing reference data
+    /// before re-seeding. Uses `DELETE FROM` (not `TRUNCATE`) to respect FK constraints
+    /// from the `positions` table — if positions reference existing reference data,
+    /// MySQL will reject the delete with a foreign-key violation error, preventing
+    /// silent data loss in dependent tables.
+    ///
+    /// - Throws: Database errors including FK constraint violations if positions
+    ///   reference existing reference data records.
+    public func deleteAll() async throws {
+        let logger = self.logger
+        try await pool.withConnection { db in
+            logger.info("Deleting all reference data records")
+            _ = try await db.query("DELETE FROM reference_data", []).get()
+            logger.info("All reference data records deleted")
+        }
+    }
+
     // MARK: - Domain-Specific Methods
 
     /// Inserts reference data records in batches for CSV ingestion.
