@@ -168,7 +168,7 @@ public final class DependencyContainer: Sendable {
     /// Reference data query, management, and CSV ingestion service.
     /// Module-qualified type: `ReferenceDataService.ReferenceDataService`
     /// to resolve the module/class name collision.
-    public let referenceDataServiceInstance: ReferenceDataService
+    public let referenceDataService: ReferenceDataService
 
     // MARK: - JobScheduler Services
 
@@ -288,7 +288,7 @@ public final class DependencyContainer: Sendable {
 
         self.csvParser = parser
         self.csvExporter = exporter
-        self.referenceDataServiceInstance = refDataService
+        self.referenceDataService = refDataService
 
         // ──────────────────────────────────────────────────
         // 7. JobScheduler Services (depend on multiple modules — wired last)
