@@ -74,7 +74,7 @@ import Logging
 /// - **Persistence**: All 7 repositories + `ConnectionPool` + `DatabaseManager`
 /// - **Shared**: `AppError`, `AppConstants`
 /// - **ReferenceDataService**: `ReferenceData` model for price verification
-@Suite("End-to-End Workflow Tests — Gate 1")
+@Suite("End-to-End Workflow Tests — Gate 1", .serialized)
 struct EndToEndWorkflowTests {
 
     // MARK: - Gate 1 Primary Test

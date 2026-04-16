@@ -13,6 +13,12 @@ import MySQLKit
 @testable import Persistence
 @testable import Shared
 
+#if canImport(Glibc)
+import Glibc
+#elseif canImport(Darwin)
+import Darwin
+#endif
+
 // MARK: - _SetupGuard (Cross-Suite Synchronization)
 
 /// Actor-based synchronization guard for ``TestDatabaseSetup/setUp()``.
@@ -66,6 +72,37 @@ private actor _SetupGuard {
     /// after ``TestDatabaseSetup/tearDown()`` cleans up shared infrastructure.
     func reset() {
         setupTask = nil
+    }
+}
+
+// MARK: - Process-Exit Cleanup Registration
+
+/// Flag ensuring the atexit cleanup handler is registered at most once.
+/// Marked `nonisolated(unsafe)` because it follows the same sequential
+/// lifecycle as TestDatabaseSetup — set once during setUp(), read once.
+private nonisolated(unsafe) var _cleanupRegistered = false
+
+/// Registers a process-exit handler that drops the `accounting_test` schema
+/// when the test process terminates. This ensures cleanup happens even if
+/// no individual test suite explicitly calls `TestDatabaseSetup.tearDown()`.
+///
+/// Uses `atexit` with a synchronous shell command to avoid async/await
+/// complications in the process termination context. Best-effort: if the
+/// drop fails, setUp() will handle it on the next test run by dropping
+/// and recreating the schema.
+private func _registerProcessExitCleanup() {
+    guard !_cleanupRegistered else { return }
+    _cleanupRegistered = true
+
+    // Register a C-compatible closure that drops the test schema on exit.
+    // The closure captures nothing — the database name is a string literal.
+    // system() is synchronous and available from the C standard library.
+    atexit {
+        #if canImport(Glibc)
+        _ = Glibc.system("mysql -u root -e 'DROP DATABASE IF EXISTS accounting_test' 2>/dev/null")
+        #elseif canImport(Darwin)
+        _ = Darwin.system("mysql -u root -e 'DROP DATABASE IF EXISTS accounting_test' 2>/dev/null")
+        #endif
     }
 }
 
@@ -248,6 +285,12 @@ enum TestDatabaseSetup {
             try await TestDatabaseSetup.connectionPool.withConnection { db in
                 try await migrationManager.runMigrations(on: db.sql())
             }
+
+            // Step 8: Register process-exit cleanup handler (once only).
+            // This ensures the `accounting_test` schema is dropped when the
+            // test process exits, even if no individual suite calls tearDown().
+            // Best-effort: if cleanup fails, setUp() will re-drop on next run.
+            _registerProcessExitCleanup()
         }
     }
 
