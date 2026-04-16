@@ -105,7 +105,7 @@ Entitlements control what each user can do within each account group. WealthLedg
 1. Select a **User** from the user dropdown.
 2. Select an **Account Group** from the group dropdown.
 3. Toggle the permission checkboxes for **Read**, **Create**, **Modify**, and **Delete** as needed.
-4. Click **Assign**.
+4. Click **Assign Entitlement**.
 
 **Important notes:**
 
@@ -212,9 +212,9 @@ This design ensures that each account's valuation date accurately reflects the c
 
 The Job Scheduler screen allows you to create and manually run two types of jobs: **Report Generation** and **CSV Data Ingestion**. All jobs are triggered manually — there is no automatic or scheduled execution.
 
-### Creating a Report Generation Job
+### Generating a Report
 
-Report jobs generate CSV files containing account and valuation data.
+Report jobs generate CSV files containing account and valuation data. Clicking the trigger button creates the job **and immediately executes it** in a single action.
 
 **Steps:**
 
@@ -222,31 +222,32 @@ Report jobs generate CSV files containing account and valuation data.
 2. **Select fields** to include in the report by checking the desired field checkboxes. Available fields include account name, account ID, valuation amount, positions, value date, and more.
 3. **Select accounts** to include — you can search for and choose specific accounts or entire account groups.
 4. **Pick a target date** — the date for which report data should be generated.
-5. Click **"Create Job"**.
+5. Click **"Generate Report"**.
 
-The job appears in the job list with a status of **Pending**.
+The job is created and execution begins immediately. The job appears in the job list and its status progresses from **Running** to **Completed** (success) or **Failed** (error encountered).
 
-### Creating a CSV Ingestion Job
+### Running a CSV Ingestion
 
-Ingestion jobs import data from CSV files on your local machine into the database.
+Ingestion jobs import data from CSV files on your local machine into the database. Like report jobs, clicking the trigger button creates the job **and immediately executes it**.
 
 **Steps:**
 
 1. Select **"Ingestion"** as the job type.
-2. **Choose a CSV file** using the file picker. You can select files up to **100 MB** in size.
+2. **Choose a CSV file** using the file picker (click **"Browse…"**). You can select files up to **100 MB** in size.
 3. **Specify the data type** the CSV contains (for example, reference data or account data).
-4. Click **"Create Job"**.
+4. Click **"Start Ingestion"**.
 
-The job appears in the job list with a status of **Pending**.
+The job is created and execution begins immediately. The job appears in the job list and its status progresses from **Running** to **Completed** (success) or **Failed** (error encountered).
 
-### Running a Job
+### Re-Running a Pending Job
+
+If a job remains in the **Pending** state (for example, if execution was interrupted), you can manually trigger it from the job list:
 
 1. Find the job in the **Job List**.
-2. Click the **"Run"** button next to any job with a **Pending** status.
-3. The job status changes to **Running** while it executes.
-4. When complete, the status changes to **Completed** (success) or **Failed** (error encountered).
+2. Click the **"Run"** button (▶️) next to the pending job.
+3. The job status changes to **Running** while it executes, then to **Completed** or **Failed**.
 
-Only jobs in the **Pending** state can be triggered. Jobs that have already been run (Completed or Failed) cannot be re-triggered.
+Only jobs in the **Pending** state display the **Run** button. Jobs that have already been run (Completed or Failed) cannot be re-triggered.
 
 ### Job Status Tracking
 
@@ -311,7 +312,7 @@ Every account in WealthLedger has one of four lifecycle statuses. Administrators
 |--------|-------------|-------------|
 | **Active** | 🟢 Green | The account is fully operational. It participates in valuations and can receive new transactions. |
 | **Inactive** | ⚪ Gray | The account is dormant. No new transactions can be posted, but historical data remains accessible. |
-| **Pending** | 🟡 Yellow | The account has been created but has not yet been activated. It is awaiting administrative approval or setup completion. |
+| **Pending** | 🟠 Orange | The account has been created but has not yet been activated. It is awaiting administrative approval or setup completion. |
 | **Suspended** | 🔴 Red | The account has been temporarily frozen. No operations of any kind are permitted until the suspension is lifted. |
 
 ---

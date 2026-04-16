@@ -83,6 +83,46 @@ Follow these steps to initialize the local MySQL database:
 
 ---
 
+## Configuration
+
+### Database Credentials
+
+Both the setup script (`Scripts/setup_database.sh`) and the application (`WealthLedgerApp.swift`) read database credentials from the **same** environment variables. If no environment variables are set, both use identical built-in defaults so that the documented setup workflow works out of the box.
+
+| Environment Variable | Default Value | Description |
+|---------------------|---------------|-------------|
+| `DB_USERNAME` | `wealthledger` | MySQL username for the application database user |
+| `DB_PASSWORD` | `wealthledger_pass` | MySQL password for the application database user |
+| `DB_NAME` | `wealth_ledger` | MySQL database name |
+| `DB_HOST` | `localhost` | MySQL server hostname (always localhost for offline operation) |
+| `DB_PORT` | `3306` | MySQL server port |
+
+**Using defaults (recommended for local development):**
+
+No environment variable configuration is needed. Simply run the setup script and then launch the application:
+
+```bash
+./Scripts/setup_database.sh
+swift run WealthLedgerApp
+```
+
+The setup script creates the MySQL user `wealthledger` with password `wealthledger_pass` and grants it full privileges on the `wealth_ledger` database. The application connects using the same credentials by default.
+
+**Customizing credentials:**
+
+To use custom database credentials, export the environment variables before running both the setup script and the application:
+
+```bash
+export DB_USERNAME="my_custom_user"
+export DB_PASSWORD="my_custom_password"
+export DB_NAME="my_custom_db"
+
+./Scripts/setup_database.sh    # Creates the DB and user with custom credentials
+swift run WealthLedgerApp      # Connects using the same custom credentials
+```
+
+---
+
 ## Building and Running
 
 ### Build

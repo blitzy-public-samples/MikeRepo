@@ -34,19 +34,22 @@ set -euo pipefail
 # Configuration Variables
 # -------------------------------------------------------------
 # Database connection parameters with environment variable overrides.
-# Set WEALTH_LEDGER_DB_* environment variables to customize, or use
-# the defaults below. These must match the MySQLConfiguration in
-# DatabaseManager.swift:
-#   MySQLConfiguration(hostname: "localhost", port: 3306,
-#                      username: "wealth_app",
-#                      password: "<from WEALTH_LEDGER_DB_PASSWORD>",
-#                      database: "wealth_ledger")
+# Set DB_USERNAME, DB_PASSWORD, DB_NAME environment variables to
+# customize, or use the defaults below. These MUST match the
+# MySQLConfiguration in WealthLedgerApp.swift:
+#   let dbUsername = ProcessInfo.processInfo.environment["DB_USERNAME"] ?? "wealthledger"
+#   let dbPassword = ProcessInfo.processInfo.environment["DB_PASSWORD"] ?? "wealthledger_pass"
+#   let dbName     = ProcessInfo.processInfo.environment["DB_NAME"]     ?? "wealth_ledger"
+#
+# The same environment variable names (DB_USERNAME, DB_PASSWORD, DB_NAME)
+# are shared between this setup script and the application runtime to
+# ensure credential consistency.
 # -------------------------------------------------------------
-DB_NAME="${WEALTH_LEDGER_DB_NAME:-wealth_ledger}"
-DB_USER="${WEALTH_LEDGER_DB_USER:-wealth_app}"
-DB_PASSWORD="${WEALTH_LEDGER_DB_PASSWORD:-wealth_app_password}"
-DB_HOST="${WEALTH_LEDGER_DB_HOST:-localhost}"
-DB_PORT="${WEALTH_LEDGER_DB_PORT:-3306}"
+DB_NAME="${DB_NAME:-wealth_ledger}"
+DB_USER="${DB_USERNAME:-wealthledger}"
+DB_PASSWORD="${DB_PASSWORD:-wealthledger_pass}"
+DB_HOST="${DB_HOST:-localhost}"
+DB_PORT="${DB_PORT:-3306}"
 
 # -------------------------------------------------------------
 # Script Directory Resolution

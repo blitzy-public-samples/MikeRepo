@@ -18,14 +18,19 @@ WealthLedger is designed for a single concurrent user at launch with support for
 | **SwiftUI** | macOS 26 SDK | Native macOS user interface framework for all four screens |
 | **Xcode** | 26.4 | Build toolchain and IDE |
 | **macOS** | Tahoe (26) | Target operating system |
-| **MySQLKit** | 4.9.0 | SQLKit-based MySQL driver for all database access (via SPM) |
-| **MySQLNIO** | 1.7.2 | Low-level async MySQL protocol implementation (transitive dependency) |
-| **SQLKit** | 3.33.0 | SQL query builder abstraction (transitive dependency) |
-| **AsyncKit** | 1.20.0 | Connection pool management (`EventLoopGroupConnectionPool`) |
-| **SwiftNIO** | 2.82.0 | Non-blocking event-driven networking foundation |
-| **swift-nio-ssl** | 2.30.0 | TLS support for MySQL connections |
-| **swift-crypto** | 3.4.0 | Cryptographic primitives for MySQL authentication |
-| **swift-log** | 1.6.0 | Structured logging API |
+| **MySQLKit** | 4.10.1 | SQLKit-based MySQL driver for all database access (via SPM) |
+| **MySQLNIO** | 1.9.1 | Low-level async MySQL protocol implementation (transitive dependency) |
+| **SQLKit** | 3.35.0 | SQL query builder abstraction (transitive dependency) |
+| **AsyncKit** | 1.22.0 | Connection pool management (`EventLoopGroupConnectionPool`) |
+| **SwiftNIO** | 2.97.1 | Non-blocking event-driven networking foundation |
+| **swift-nio-ssl** | 2.36.1 | TLS support for MySQL connections |
+| **swift-crypto** | 4.3.1 | Cryptographic primitives for MySQL authentication |
+| **swift-log** | 1.11.0 | Structured logging API |
+| **swift-atomics** | 1.3.0 | Low-level atomic operations (transitive dependency of SwiftNIO) |
+| **swift-collections** | 1.4.1 | Ordered collections (transitive dependency of SwiftNIO) |
+| **swift-system** | 1.6.4 | System interfaces (transitive dependency) |
+| **swift-algorithms** | 1.2.1 | Sequence and collection algorithms (transitive dependency) |
+| **swift-numerics** | 1.1.1 | Numeric protocols and types (transitive dependency) |
 | **BCryptSwift** | 2.0.1 | Pure Swift bcrypt implementation for password hashing |
 | **MySQL** | 8.0 | Local relational database (installed via Homebrew) |
 | **Swift Testing** | Built-in (6.3) | Test framework included with Swift 6.3 toolchain |
@@ -88,7 +93,6 @@ graph TD
     AV --> RBAC
     AV --> AM
     SV --> AM
-    SV --> RBAC
     AVV --> AM
     AVV --> VE
     AVV --> LE
@@ -220,7 +224,7 @@ Calculates per-account closed-book Net Asset Value (NAV) using the formula: `Σ(
 - Atomic update of `accounts.cached_valuation_amount` and `accounts.cached_value_date` occurs within the same MySQL transaction as the valuation write
 - Verification: two accounts configured for `America/New_York` and `Europe/London` produce distinct value dates for the same calendar day
 
-**Dependencies:** Persistence, ReferenceDataService, AccountManagement, Shared
+**Dependencies:** Persistence, ReferenceDataService, Shared
 
 ### 5. ReferenceDataService
 
@@ -348,8 +352,8 @@ Cross-cutting utilities used by all modules. This module has no external depende
 
 | File | Purpose |
 |------|---------|
-| `Sources/Shared/Constants.swift` | `BATCH_SIZE = 1000`, `MAX_SEARCH_RESULTS = 1000`, `CASH_PRICE = Decimal(1.0)`, `DEFAULT_PAGINATION = 1000` |
-| `Sources/Shared/Errors/AppError.swift` | Typed error hierarchy: `unbalancedEntry`, `unauthorizedAccess`, `invalidAssetClass`, `accountNotFound`, `duplicateUser`, `invalidTimezone`, `migrationFailed` |
+| `Sources/Shared/Constants.swift` | `AppConstants.batchSize = 1000`, `AppConstants.maxSearchResults = 1000`, `AppConstants.cashPrice = Decimal(1.0)`, `AppConstants.defaultPagination = 1000` |
+| `Sources/Shared/Errors/AppError.swift` | Typed error hierarchy: `unbalancedEntry`, `unauthorizedAccess`, `invalidAssetClass`, `accountNotFound`, `duplicateUser`, `invalidTimezone`, `transactionNotFound`, `operationNotPermitted`, `dataAccessFailed(String)`, `jobNotFound`, `invalidJobParameters(String)`, `migrationFailed` |
 | `Sources/Shared/Extensions/Date+Timezone.swift` | `valueDateForTimezone(_ iana: String) -> Date` — computes value date using account's stored timezone exclusively |
 | `Sources/Shared/Extensions/Decimal+Currency.swift` | `midpoint(bid: Decimal, ask: Decimal) -> Decimal` — returns `(bid + ask) / 2` |
 | `Sources/Shared/Protocols/RepositoryProtocol.swift` | Generic `Repository` protocol: `findById`, `findAll`, `create`, `delete` |
@@ -366,7 +370,7 @@ A separate executable target providing a `@main` CLI entry point for generating 
 |------|---------|
 | `Sources/SeedTool/SeedToolMain.swift` | `@main` CLI: connect to MySQL, generate synthetic CSV, seed reference data (500+ rows), optionally seed accounts and users |
 
-**Dependencies:** Persistence, ReferenceDataService, AccountManagement, Shared
+**Dependencies:** Persistence, ReferenceDataService, Shared
 
 ---
 
@@ -510,14 +514,16 @@ The `DependencyContainer` (registered in `WealthLedgerApp.swift`) provides depen
 
 | Service | Dependencies Injected |
 |---------|----------------------|
-| `AccountService` | `AccountRepository`, `EntitlementService` |
+| `AccountService` | `AccountRepository`, `EntitlementService`, `AccountGroupService` |
 | `AccountGroupService` | `AccountGroupRepository` |
 | `LedgerService` | `TransactionRepository`, `PositionRepository`, `DoubleEntryValidator`, `EntitlementService` |
-| `ValuationService` | `AccountRepository`, `PositionRepository`, `ReferenceDataRepository`, `NAVCalculator` |
+| `ValuationService` | `AccountRepository`, `PositionRepository`, `ReferenceDataRepository`, `NAVCalculator`, `ConnectionPool` |
 | `ReferenceDataService` | `ReferenceDataRepository`, `CSVParser` |
+| `ReportGenerator` | `AccountService`, `ValuationService`, `CSVExporter` |
+| `CSVExporter` | (none — standalone utility) |
 | `JobSchedulerService` | `ReportGenerator`, `CSVParser`, `ReferenceDataService`, `AccountService`, `ValuationService` |
 | `AuthenticationService` | `UserRepository`, `PasswordHasher` |
-| `EntitlementService` | `EntitlementRepository` |
+| `EntitlementService` | `EntitlementRepository`, `AccountGroupRepository` |
 | All Repositories | `ConnectionPool` (via `DatabaseManager`) |
 
 ### UI-to-Module Bindings
@@ -527,8 +533,8 @@ Each SwiftUI screen depends on specific backend modules:
 | Screen | Module Dependencies |
 |--------|-------------------|
 | `AdminView` | RBAC (`AuthenticationService`, `EntitlementService`), AccountManagement (`AccountGroupService`) |
-| `SearchView` | AccountManagement (`AccountService`), RBAC (`EntitlementService`) |
-| `AccountsViewerView` | AccountManagement (`AccountService`), ValuationEngine (`ValuationService`), LedgerEngine (`LedgerService`), RBAC (`EntitlementService`) |
+| `SearchView` | AccountManagement (`AccountService`), Shared |
+| `AccountsViewerView` | AccountManagement (`AccountService`), ValuationEngine (`ValuationService`), LedgerEngine (`LedgerService`), RBAC (`EntitlementService`), ReferenceDataService, Shared |
 | `JobSchedulerView` | JobScheduler (`JobSchedulerService`), RBAC (`EntitlementService`) |
 
 ### Cross-Module Communication Patterns
@@ -553,7 +559,7 @@ The MySQL 8.0 database (`wealth_ledger`) comprises 7 tables with full foreign ke
 | `entitlements` | `id` BIGINT UNSIGNED | FK: user_id → users, account_group_id → account_groups | `003_create_entitlements.sql` |
 | `accounts` | `id` BIGINT UNSIGNED | FK: account_group_id → account_groups | `004_create_accounts.sql` |
 | `reference_data` | `id` BIGINT UNSIGNED | → positions, → transactions | `005_create_reference_data.sql` |
-| `positions` | `id` BIGINT UNSIGNED | FK: account_id → accounts, reference_data_id → reference_data | `006_create_positions.sql` |
+| `positions` | `id` BIGINT UNSIGNED | FK: account_id → accounts, instrument_id → reference_data | `006_create_positions.sql` |
 | `transactions` | `id` BIGINT UNSIGNED | FK: account_id → accounts, instrument_id → reference_data, restatement_ref_id → transactions (self) | `007_create_transactions.sql` |
 
 Index optimization is defined in `008_create_indexes.sql`. See `Docs/database_schema.md` for complete DDL, ERD, foreign key map, and index strategy documentation.
@@ -658,7 +664,8 @@ WealthLedger/
 │   │   ├── WealthLedgerApp.swift
 │   │   ├── AppState.swift
 │   │   └── DependencyContainer.swift
-│   ├── AccountManagement/                 # Account lifecycle (6 files)
+│   ├── AccountManagement/                 # Account lifecycle (7 files)
+│   │   ├── Placeholder.swift
 │   │   ├── Models/
 │   │   │   ├── Account.swift
 │   │   │   ├── AccountGroup.swift
@@ -674,7 +681,8 @@ WealthLedger/
 │   │   └── Services/
 │   │       ├── LedgerService.swift
 │   │       └── DoubleEntryValidator.swift
-│   ├── ValuationEngine/                   # NAV valuation (3 files)
+│   ├── ValuationEngine/                   # NAV valuation (4 files)
+│   │   ├── Placeholder.swift
 │   │   ├── Models/
 │   │   │   └── Valuation.swift
 │   │   └── Services/
@@ -703,7 +711,8 @@ WealthLedger/
 │   │       ├── AuthenticationService.swift
 │   │       ├── EntitlementService.swift
 │   │       └── PasswordHasher.swift
-│   ├── UILayer/                           # SwiftUI views (8 files)
+│   ├── UILayer/                           # SwiftUI views (9 files)
+│   │   ├── Placeholder.swift
 │   │   ├── Navigation/
 │   │   │   └── MainNavigationView.swift
 │   │   ├── AdminScreen/
@@ -770,7 +779,7 @@ WealthLedger/
     └── user_guide.md                      # Screen-by-screen user guide
 ```
 
-**Total: approximately 87 files** composing the complete application.
+**Total: approximately 90 files** composing the complete application (including 3 module-level `Placeholder.swift` scaffolding files used by the SPM build system).
 
 ---
 
