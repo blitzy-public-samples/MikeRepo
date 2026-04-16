@@ -145,6 +145,13 @@ private actor JobStore {
 /// - ``ValuationService`` — provides valuation data for reports
 public final class JobSchedulerService: Sendable {
 
+    // MARK: - Constants
+
+    /// Maximum records per batch for job operations (Rule 7 — Batch Memory Cap).
+    /// Report generation and CSV ingestion delegate to their respective services
+    /// which paginate at this limit. Sourced from ``AppConstants/batchSize``.
+    private static let jobBatchLimit: Int = AppConstants.batchSize
+
     // MARK: - Properties (all immutable for Sendable safety)
 
     /// Report generation engine for report-type jobs.
@@ -236,16 +243,17 @@ public final class JobSchedulerService: Sendable {
     ///   - userId: The authenticated user ID triggering the job. Passed to
     ///     ``ReportGenerator`` for entitlement-filtered data access.
     /// - Returns: The updated `Job` with final status (`.completed` or `.failed`).
-    /// - Throws: ``AppError/dataAccessFailed(_:)`` if the job ID is not found.
+    /// - Throws: ``AppError/accountNotFound`` if the job ID is not found.
+    ///   ``AppError/operationNotPermitted`` if the job is not in `.pending` status.
     public func executeJob(id: UInt64, userId: UInt64) async throws -> Job {
         // Verify job exists
         guard let job = await jobStore.getJob(id: id) else {
-            throw AppError.dataAccessFailed("Job with ID \(id) not found")
+            throw AppError.accountNotFound
         }
 
-        // Only pending jobs can be executed
+        // Only pending jobs can be executed — reject already-processed or running jobs
         guard job.status == .pending else {
-            throw AppError.dataAccessFailed("Job \(id) is not in pending status (current: \(job.status))")
+            throw AppError.operationNotPermitted
         }
 
         // Transition to running
@@ -263,9 +271,10 @@ public final class JobSchedulerService: Sendable {
 
             case .ingestion:
                 // Delegate to ReferenceDataService for CSV ingestion.
-                // CSVParser internally streams and batches at 1,000 rows (Rule 7).
+                // CSVParser internally streams and batches at AppConstants.batchSize
+                // rows per page (Rule 7) — files up to 100MB supported (Rule 13).
                 guard let filePath = job.parameters.sourceFilePath else {
-                    throw AppError.dataAccessFailed("Ingestion job \(id) missing sourceFilePath")
+                    throw AppError.migrationFailed
                 }
                 try await referenceDataService.ingestCSV(at: filePath)
             }
