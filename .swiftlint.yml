@@ -1,0 +1,149 @@
+# =============================================================================
+# SwiftLint Configuration for WealthLedger
+# =============================================================================
+# Enforces Swift coding conventions consistent with Swift 6 strict concurrency.
+# This configuration is designed for a macOS desktop application using SwiftUI,
+# MySQLKit, and BCryptSwift with zero tolerance for force-unwrapping crashes
+# and full compatibility with Swift 6 strict concurrency checking.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Paths
+# -----------------------------------------------------------------------------
+# Lint only the application source and test directories.
+included:
+  - Sources/
+  - Tests/
+
+# Exclude build artifacts, Xcode project internals, and non-Swift resources.
+excluded:
+  - .build/
+  - DerivedData/
+  - WealthLedger.xcodeproj/
+  - Resources/
+
+# -----------------------------------------------------------------------------
+# Disabled Rules
+# -----------------------------------------------------------------------------
+# Rules disabled because they are handled by swift-format or are intentionally
+# relaxed for this project.
+disabled_rules:
+  - trailing_whitespace   # Handled by swift-format
+  - todo                  # Allow TODO comments during development
+  - line_length           # Handled by swift-format with 120-character limit
+
+# -----------------------------------------------------------------------------
+# Opt-In Rules
+# -----------------------------------------------------------------------------
+# Additional rules enabled beyond the default set to enforce stricter code
+# quality standards appropriate for a financial services application.
+opt_in_rules:
+  - closure_end_indentation
+  - closure_spacing
+  - collection_alignment
+  - contains_over_filter_count
+  - contains_over_filter_is_empty
+  - contains_over_first_not_nil
+  - contains_over_range_nil_comparison
+  - convenience_type
+  - empty_collection_literal
+  - empty_count
+  - empty_string
+  - enum_case_associated_values_count
+  - explicit_init
+  - extension_access_modifier
+  - fallthrough
+  - fatal_error_message
+  - file_name_no_space
+  - first_where
+  - flatmap_over_map_reduce
+  - force_unwrapping
+  - identical_operands
+  - implicit_return
+  - joined_default_parameter
+  - last_where
+  - legacy_multiple
+  - literal_expression_end_indentation
+  - modifier_order
+  - multiline_arguments
+  - multiline_function_chains
+  - operator_usage_whitespace
+  - overridden_super_call
+  - prefer_self_in_static_references
+  - prefer_self_type_over_type_of_self
+  - prefer_zero_over_explicit_init
+  - private_action
+  - private_outlet
+  - prohibited_super_call
+  - redundant_nil_coalescing
+  - redundant_type_annotation
+  - sorted_first_last
+  - toggle_bool
+  - unneeded_parentheses_in_closure_argument
+  - vertical_parameter_alignment_on_call
+  - yoda_condition
+
+# -----------------------------------------------------------------------------
+# Custom Rule Configurations
+# -----------------------------------------------------------------------------
+
+# Maximum number of lines in a type body before triggering a warning or error.
+type_body_length:
+  warning: 300
+  error: 500
+
+# Maximum number of lines in a single file before triggering a warning or error.
+file_length:
+  warning: 500
+  error: 1000
+
+# Maximum number of lines in a function body before triggering a warning or error.
+function_body_length:
+  warning: 60
+  error: 100
+
+# Maximum number of parameters a function should accept.
+function_parameter_count:
+  warning: 6
+  error: 8
+
+# Maximum nesting depth for types and functions.
+nesting:
+  type_level:
+    warning: 2
+  function_level:
+    warning: 3
+
+# Identifier naming constraints with exclusions for common short identifiers
+# used throughout the WealthLedger codebase (e.g., database handles, loop vars).
+identifier_name:
+  min_length:
+    warning: 2
+    error: 1
+  max_length:
+    warning: 50
+    error: 60
+  excluded:
+    - id
+    - to
+    - x
+    - y
+    - i
+    - j
+    - db
+
+# Maximum number of elements in a tuple before triggering a warning or error.
+large_tuple:
+  warning: 3
+  error: 4
+
+# Maximum cyclomatic complexity of a function before triggering a warning or error.
+cyclomatic_complexity:
+  warning: 15
+  error: 25
+
+# -----------------------------------------------------------------------------
+# Reporter
+# -----------------------------------------------------------------------------
+# Use the Xcode reporter for seamless integration with Xcode build output.
+reporter: xcode
