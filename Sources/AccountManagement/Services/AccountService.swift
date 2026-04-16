@@ -284,6 +284,11 @@ public final class AccountService: Sendable {
             throw AppError.unauthorizedAccess
         }
 
+        // Validate account name is non-empty (defense-in-depth; schema CHECK enforces too)
+        guard !account.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw AppError.dataAccessFailed("Account name must not be empty")
+        }
+
         // Rule 3: Validate IANA timezone string
         guard TimeZone(identifier: account.valuationTimezone) != nil else {
             throw AppError.invalidTimezone
@@ -348,6 +353,11 @@ public final class AccountService: Sendable {
         )
         guard hasPermission else {
             throw AppError.unauthorizedAccess
+        }
+
+        // Validate account name is non-empty (defense-in-depth; schema CHECK enforces too)
+        guard !account.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw AppError.dataAccessFailed("Account name must not be empty")
         }
 
         // Rule 3: Validate IANA timezone string
