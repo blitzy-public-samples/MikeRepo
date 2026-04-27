@@ -1,0 +1,139 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:blitzy:technology-estate-report:grade-history:v0.1.0",
+  "title": "Technology Estate Report — Grade History Record",
+  "description": "JSON Schema (Draft 2020-12) contract for a single persistence record in the grade history layer of the Technology Estate Report Blitzy prompt template package. One record represents the grade outcome for exactly one (application_id, facet, run_date) tuple — the composite storage key documented in ../docs/grade-history.md § Storage Key. The schema validates one record at a time; the uniqueness of the composite key across the persistence layer is enforced by the storage layer itself, not by this schema. Per Rule R3 (grade history fidelity), prior-run records are immutable: subsequent runs append new records but MUST NOT mutate, delete, or rewrite prior records — this guarantees the unbroken grade-history continuity required by Rule R7 (application identity stability) verification (\"grade history for a repo is continuous across three sequential runs with no duplicate or orphaned entries\"). Per Rule R7, the application_id field is constrained to the org/repo regex — the same repository MUST resolve to the same application_id across all runs, and the identity key format MUST NOT change between runs. Per Rule R9 (CVE attribution), security-facet records carry scan_metadata with a scan timestamp (ISO 8601) and the source database label (NVD, OSV, or both); the requirement is enforced via the top-level allOf if/then conditional rather than a static required entry so that non-security records remain unaffected. Per Rule R10 (new repo compatibility) and Rule R2 (facet completeness) and Rule R5 (Complexity placeholder integrity), the grade enum admits the special non-letter values N/A (documented absence of a prior record, used for net-new repositories' first runs), InsufficientData (data source unavailable; cell renders \"Insufficient Data\" in the PDF), and TBD (Complexity facet placeholder until a Complexity rubric is supplied) — these are emitted by the grading engine, the persistence layer, or the PDF renderer based on data-availability conditions and the Rule R5 Complexity-lock and are NEVER supplied by a rubric author. Operational documentation lives at ../docs/grade-history.md, the Security-facet attribution contract at ../docs/api-integrations.md § R9 Attribution Rule, and worked examples (first-run record, second-run record showing prior + ISO date, net-new repository joining a recurring run) at ../examples/grade-history-example.json.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "application_id",
+    "facet",
+    "run_date",
+    "grade"
+  ],
+  "properties": {
+    "application_id": {
+      "type": "string",
+      "title": "Application Identifier",
+      "description": "The stable identity key for the repository under analysis, in the canonical org/repo form per Rule R7 (application identity stability). The same repository MUST resolve to the same application_id across all runs; changing the key format between runs is prohibited (Rule R7). The leading org segment is the repository owner (GitHub organization, GitHub user, or GitLab group/namespace) and the trailing repo segment is the repository name; the two are joined by a single forward slash. Each segment must begin with an alphanumeric character and may contain only alphanumeric characters, dots, underscores, or hyphens — this matches the union of GitHub.com and GitLab.com permitted characters for owners and repository names. The application_id is also the secondary grouping key for the rendered PDF: the org segment is used as a grouping label per the user prompt § 2 Task Context.",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]*\\/[a-zA-Z0-9][a-zA-Z0-9._-]*$",
+      "minLength": 3,
+      "maxLength": 200,
+      "examples": [
+        "acme-inc/acme-api",
+        "internal-tools/log-aggregator"
+      ]
+    },
+    "facet": {
+      "type": "string",
+      "title": "Facet Identifier",
+      "description": "One of the four canonical facet identifiers per the user prompt § 3.2 Facet Analysis. The four-facet matrix column order is fixed and immutable per Rule R2 (facet completeness): Tech Stack | Maturity | Security | Complexity. The enum order below mirrors this canonical column order. The Complexity facet is locked to grade \"TBD\" per Rule R5 (Complexity placeholder integrity) until an explicit Complexity rubric is supplied; a Complexity record's grade field MAY also take a letter A–F once the user supplies thresholds.",
+      "enum": [
+        "tech_stack",
+        "maturity",
+        "security",
+        "complexity"
+      ]
+    },
+    "run_date": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Run Timestamp",
+      "description": "The ISO 8601 datetime at which this run was executed. The Draft 2020-12 format identifier \"date-time\" maps to RFC 3339 / ISO 8601 datetime values (e.g., \"2025-10-01T00:00:00Z\"). Per Rule R3 (grade history fidelity), this value is rendered inline in the prior-grade slot of subsequent runs in the user-prompt verbatim worked-example format \"B  ←  prev: C  |  2025-10-01\" — the date portion of run_date is what populates the trailing date segment after the pipe in that format. Per Rule R7 verification, run_date is also the discriminator that orders sequential runs against the same repository and facet, enabling continuous grade history across three sequential runs with no duplicate or orphaned entries.",
+      "examples": [
+        "2025-10-01T00:00:00Z",
+        "2026-01-15T12:34:56Z"
+      ]
+    },
+    "grade": {
+      "type": "string",
+      "title": "Grade",
+      "description": "The grade outcome emitted by the grading engine for this (application_id, facet, run_date) tuple. The enum admits eight values across three categories: (1) the canonical letter grades A, B, C, D, F emitted by the grading engine when the user-supplied rubric (per Rule R1) matches the per-facet raw data; (2) the special non-letter value TBD reserved for the Complexity facet placeholder per Rule R5 — the Complexity column is locked to \"Grade: TBD — definition pending\" until an explicit Complexity rubric is supplied, and the column MUST NOT be removed, collapsed, or backfilled with an inferred grade until that rubric arrives; (3) the special non-letter values N/A and InsufficientData used by the persistence and PDF rendering layers — N/A documents the absence of a prior record for an (application_id, facet) pair (used in heterogeneous-scope runs per Rule R10 to denote a net-new repository's first run, and rendered in the prior-grade slot of subsequent runs per Rule R3), and InsufficientData represents a current-run cell whose source data was unavailable per Rule R2 (rendered as the literal string \"Insufficient Data\" in the PDF; the schema uses the camel-cased identifier InsufficientData to remain a single-token enum value while Rule R2 mandates the human-readable two-word string at render time, with the mapping documented in ../docs/troubleshooting.md and ../docs/pdf-output.md § Cell Rendering Format). The TBD, N/A, and InsufficientData values are emitted by the engine, the persistence layer, or the renderer — they are NEVER supplied by a rubric author (the rubric author's permitted grade values are constrained by ../schemas/rubric.schema.json#/$defs/rubricEntry/properties/grade, which enumerates only A, B, C, D, F).",
+      "enum": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "F",
+        "TBD",
+        "N/A",
+        "InsufficientData"
+      ]
+    },
+    "raw_data": {
+      "type": "object",
+      "title": "Raw Data",
+      "description": "Optional facet-specific raw data captured at run time. The object shape is per-facet and the canonical per-facet shapes are documented in ../docs/facets.md and ../docs/grade-history.md § Raw Data Conventions. Suggested per-facet contents: for Tech Stack — language % share by file count, detected cloud providers from IaC resource types, vendor/framework extraction from dependency manifests; for Maturity — detected runtime versions and their EOL status from the endoflife.date API v1 lookup (per ../docs/api-integrations.md § endoflife.date API v1) plus the percentage of out-of-support dependencies; for Security — the CycloneDX SBOM digest and the per-severity-tier CVE counts (Critical, High, Medium, Low, plus total) per Rule R4 (CVE severity breakdown); for Complexity — LOC, file count, and contributor count from git history per Rule R5. The schema accepts additional properties (additionalProperties: true) to allow forward-compatible per-facet expansion without requiring a schema migration; per the AAP § 0.10.2 \"No Redundancy Rule\", the per-facet shape contracts live in ../docs/facets.md rather than being duplicated here.",
+      "additionalProperties": true
+    },
+    "scan_metadata": {
+      "$ref": "#/$defs/scanMetadata"
+    }
+  },
+  "allOf": [
+    {
+      "title": "Security Facet Attribution Conditional",
+      "description": "Per Rule R9 (CVE attribution), every Security Summary result MUST include the scan timestamp (ISO 8601) and the source database (NVD, OSV, or both); undated or unattributed CVE counts are a failing state. This conditional schema enforces the rule structurally: when facet equals \"security\", scan_metadata is REQUIRED. Non-security records (tech_stack, maturity, complexity) are unaffected — their scan_metadata field remains optional. The if branch tests for facet == \"security\" using a const constraint; the then branch adds scan_metadata to the required list for the matching record. This applies in addition to the top-level required list (application_id, facet, run_date, grade).",
+      "if": {
+        "properties": {
+          "facet": {
+            "const": "security"
+          }
+        },
+        "required": [
+          "facet"
+        ]
+      },
+      "then": {
+        "required": [
+          "scan_metadata"
+        ]
+      }
+    }
+  ],
+  "$defs": {
+    "scanMetadata": {
+      "type": "object",
+      "title": "Scan Metadata",
+      "description": "Per Rule R9 (CVE attribution), every Security Summary result MUST include the scan timestamp (ISO 8601) and the source database label (NVD, OSV, or both). Undated or unattributed CVE counts are a failing state per Rule R9. This subschema is REQUIRED on every record where facet == \"security\" (enforced by the top-level allOf if/then conditional) and is OPTIONAL on records for the tech_stack, maturity, and complexity facets — non-security facets MAY use this object to document their own data-source attribution (for example, the Maturity facet's endoflife.date lookup timestamp and source label) but are not required to do so by this schema. The two required fields capture the full attribution required by Rule R9 verification (\"each Security Summary cell or report footnote contains timestamp and database label\").",
+      "additionalProperties": false,
+      "required": [
+        "timestamp",
+        "sources"
+      ],
+      "properties": {
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "title": "Scan Timestamp",
+          "description": "The ISO 8601 datetime at which the underlying CVE scan was executed. The Draft 2020-12 format identifier \"date-time\" maps to RFC 3339 / ISO 8601 datetime values (e.g., \"2025-10-01T00:00:00Z\"). Per Rule R9, this field MUST NOT be omitted on any security-facet record; an undated CVE count is an explicit failing state. The scan_metadata.timestamp is logically distinct from the parent record's run_date: the run_date is the moment the template was invoked, while scan_metadata.timestamp is the moment the CVE database lookup itself was performed (which may differ if the CVE pipeline caches NVD/OSV responses across multiple runs).",
+          "examples": [
+            "2025-10-01T00:00:00Z",
+            "2026-01-15T12:34:56Z"
+          ]
+        },
+        "sources": {
+          "type": "array",
+          "title": "Source Databases",
+          "description": "Per Rule R9 (CVE attribution), the canonical CVE source databases are NVD (the U.S. National Vulnerability Database, accessed via NVD CVE API v2.0 at https://services.nvd.nist.gov per ../docs/api-integrations.md § NVD CVE API v2.0) and OSV (the Open Source Vulnerabilities database, accessed via OSV API v1 at https://api.osv.dev per ../docs/api-integrations.md § OSV API v1). Valid array contents per Rule R9 are: [\"NVD\"] (NVD only); [\"OSV\"] (OSV only); or [\"NVD\", \"OSV\"] (both, the canonical \"NVD+OSV\" composite case used when the CVE pipeline cross-references both databases for a single scan). The array is constrained to minItems: 1 (at least one source MUST be cited per Rule R9 — an unattributed CVE count is a failing state) and uniqueItems: true (each source MUST be cited at most once per record; the array form is a set, not a multiset).",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "title": "Source Database Identifier",
+            "description": "One of the two canonical CVE source databases used by the Security facet's CVE pipeline per ../docs/api-integrations.md. The enum is uppercase (NVD, OSV) per the verbatim labels used in the user prompt Rule R9. The mixed-case forms (Nvd, nvd, Osv, osv) and the spelled-out forms (e.g., \"National Vulnerability Database\") are NOT accepted — Rule R9 verification checks for the exact uppercase label.",
+            "enum": [
+              "NVD",
+              "OSV"
+            ]
+          },
+          "examples": [
+            ["NVD"],
+            ["OSV"],
+            ["NVD", "OSV"]
+          ]
+        }
+      }
+    }
+  }
+}
