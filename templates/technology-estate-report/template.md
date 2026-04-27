@@ -275,7 +275,7 @@ This section is the **canonical, verbatim** location for all five Validation Gat
 
 **Operationalized in:** [`./docs/troubleshooting.md`](./docs/troubleshooting.md), [`./docs/validation.md`](./docs/validation.md) § Gate 2.
 
-#### 6.1.3 Gate 8 — Integration sign-off checklist
+#### 6.1.3 Gate 8 — Integration sign-off checklist (independent of unit test pass rate)
 
 > Before delivery, all four must be confirmed: Live smoke test, API contract verification, Grade history verification, Rubric verification.
 

@@ -25,12 +25,18 @@ The package is **standalone**: it has no dependency on any other Blitzy flow or 
 | Application identity key | `org/repo` (stable across all runs per Rule R7) |
 | Grading scale | A–F (per user-supplied rubric per Rule R1) |
 | Complexity facet | Locked to `Grade: TBD — definition pending` until rubric is supplied (per Rule R5) |
-| Grade history format | `B  ←  prev: C  \|  2025-10-01` (per Rule R3 cell-rendering example) |
+| Grade history format | Inline current grade, then prior grade and ISO 8601 date (per Rule R3 — verbatim example below) |
 | First-run prior grade | `N/A` (per Rule R3) |
 | Failed-data-source cell | `Insufficient Data` (per Rule R2) |
 | Standalone | Yes — no dependency on other Blitzy flows or templates |
 | Ingestion pipeline | Consumed read-only; not modified |
 | External APIs | GitHub/GitLab (`GITHUB_TOKEN`/`GITLAB_TOKEN`), endoflife.date v1, NVD CVE API v2.0 (optional `NVD_API_KEY`), OSV API v1 |
+
+The Rule R3 cell-rendering example is reproduced byte-for-byte from the user prompt below. Inside the fenced code block the pipe character is the bare ASCII `|` (0x7C); outside fenced code blocks the pipe is escaped as `\|` only when it appears inside a Markdown table cell (where a bare pipe would be misparsed as a column delimiter).
+
+```text
+B  ←  prev: C  |  2025-10-01
+```
 
 ## Quick Start
 
@@ -158,6 +164,8 @@ graph LR
     B --> G[docs/grade-history.md<br/>persistence + R3,R7,R10]
     B --> H[docs/pdf-output.md<br/>R8 + cell format]
     B --> I[docs/architecture.md<br/>component graph + Gate 9]
+    B --> U[docs/configuration.md<br/>config reference]
+    B --> V[docs/executive-summary.md<br/>portfolio aggregation]
     F --> J[schemas/rubric.schema.json]
     G --> K[schemas/grade-history.schema.json]
     H --> L[schemas/report-output.schema.json]
@@ -170,6 +178,9 @@ graph LR
     E --> S[config/facets.yaml<br/>severity tiers]
     D --> T[docs/troubleshooting.md<br/>R2 + Gate 2]
     I --> D
+    U --> S
+    U --> M
+    U --> R
 ```
 
 ## Rules at a Glance
