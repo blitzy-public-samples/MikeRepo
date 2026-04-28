@@ -59,6 +59,11 @@ facets:
       - "No source files detected"
       - "No dependency manifests detected"
       - "All three sub-detectors (language, cloud, vendor/framework) failed"
+    # Per-facet GitHub-Markdown anchor fragment for cross-document linking.
+    # Mirrors the fragment portion of `documentation:` below; exposed as a
+    # separate key so downstream consumers can read just the anchor without
+    # parsing the documentation URL.
+    facet_anchor: "#tech-stack-summary"
     documentation: ../docs/facets.md#tech-stack-summary
     # Language detection: file-extension-to-language map with % share by
     # file count, per AAP § 0.5.2.
@@ -104,6 +109,9 @@ facets:
       - "No dependency manifests or runtime declarations detected"
       - "endoflife.date does not track any of the detected products (no slug resolution)"
       - "endoflife.date API persistently unreachable after retries (per Gate 2, surface as Insufficient Data)"
+    # Per-facet GitHub-Markdown anchor fragment for cross-document linking.
+    # Mirrors the fragment portion of `documentation:` below.
+    facet_anchor: "#maturity-summary"
     documentation: ../docs/facets.md#maturity-summary
     # endoflife.date /api/v1/products/{product}/ EOL lookup. The API contract
     # (base URL, no auth, beta-status caveat) lives in ../docs/api-integrations.md.
@@ -140,6 +148,9 @@ facets:
       - "SBOM generation failed for all detected ecosystems"
       - "Both NVD and OSV CVE databases persistently unreachable after retries"
       - "No dependency manifests detected"
+    # Per-facet GitHub-Markdown anchor fragment for cross-document linking.
+    # Mirrors the fragment portion of `documentation:` below.
+    facet_anchor: "#security-summary"
     documentation: ../docs/facets.md#security-summary
     # SBOM generation: per-ecosystem CycloneDX SBOMs. Per-ecosystem generator
     # selection table is in ../docs/api-integrations.md § SBOM Generation.
@@ -195,6 +206,9 @@ facets:
     insufficient_data_conditions:
       - "No source files detected"
       - "git history unavailable (e.g., shallow clone or fetch failure)"
+    # Per-facet GitHub-Markdown anchor fragment for cross-document linking.
+    # Mirrors the fragment portion of `documentation:` below.
+    facet_anchor: "#complexity-summary"
     documentation: ../docs/facets.md#complexity-summary
     # PRESERVE VERBATIM: em-dash is U+2014 (UTF-8 0xE2 0x80 0x94), not a
     # hyphen-minus and not an en-dash. This literal is byte-for-byte
@@ -269,6 +283,25 @@ severity_tier_mapping:
       is not silently dropped; it is recorded under an 'unscored' bucket
       and surfaces as Insufficient Data if it is the only available signal
       for the facet.
+
+# ---------------------------------------------------------------------------
+# severity_tier_labels — canonical, highest-severity-first label ordering
+#
+# Per Rule R4 (CVE severity breakdown), the Security Summary cell MUST
+# report CVE counts broken out by these four severity tiers plus a total
+# count. This top-level array exposes the canonical label ordering used
+# by the PDF renderer for column ordering within the Security cell, and
+# by the executive summary aggregator for grade-distribution counts. It
+# mirrors severity_tier_mapping.tiers[].name above and is referenced by
+# facets.security.severity_tier_counting.tiers. Downstream consumers
+# read this array directly rather than re-listing the labels elsewhere,
+# preserving the single-source-of-truth property of this file.
+# ---------------------------------------------------------------------------
+severity_tier_labels:
+  - Critical
+  - High
+  - Medium
+  - Low
 
 # ---------------------------------------------------------------------------
 # rendering_defaults — single source of truth for cell-rendering literals
