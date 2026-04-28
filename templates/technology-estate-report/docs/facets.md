@@ -179,6 +179,21 @@ value `Insufficient Data`.
 When raw data is available and the rubric matches, the Tech Stack Summary cell renders:
 
 - The **A–F current grade** emitted by the grading engine per [`./grading-engine.md`](./grading-engine.md)
+  for the `(application_id, tech_stack)` pair, as the visually prominent first segment of the cell.
+- The **prior-grade segment** per Rule R3, formatted as `prev: <prior_grade>  |  <ISO 8601 date>`, where
+  `<prior_grade>` is the most recent prior persisted grade and `<ISO 8601 date>` is the prior run's
+  `run_date`. When no prior persistence record exists for the `(application_id, tech_stack)` pair, the
+  prior-grade slot renders the literal value `N/A` per Rule R3 (see also Rule R10 for the heterogeneous
+  run-scope onboarding case in [`./grade-history.md`](./grade-history.md) § Heterogeneous Scope).
+- A **brief multi-line summary** of the detected stack — typically the top languages by % share, the
+  identified cloud providers, and a short count of detected frameworks. The summary text is rendered in
+  business-outcome language for CIO/CTO consumption and avoids implementation jargon.
+
+When source data is unavailable, the **entire cell value** is `Insufficient Data` per Rule R2; the
+prior-grade segment is suppressed for visual clarity per [`./pdf-output.md`](./pdf-output.md) § Cell
+Rendering Format. The full prior-grade record remains queryable via the persistence layer; suppression
+applies only to the rendered cell text.
+
 ## Maturity Summary
 
 The Maturity Summary facet characterizes the per-application **end-of-life (EOL) and out-of-support
@@ -256,9 +271,10 @@ rather than duplicating the URL or rate-limit semantics.
 
 #### EOL Status Lookup
 
-For each resolved `(product_slug, version)` pair, the detector calls
-`GET https://endoflife.date/api/v1/products/{product_slug}/` and parses the response to determine the
-EOL status of the specified version. Per the API specification documented in
+For each resolved `(product_slug, version)` pair, the detector issues an HTTP GET against the
+documented `/api/v1/products/{product_slug}/` endpoint per
+[`./api-integrations.md`](./api-integrations.md) § endoflife.date API v1 and parses the response to
+determine the EOL status of the specified version. Per the API specification documented in
 [`./api-integrations.md`](./api-integrations.md) § endoflife.date API v1, the per-cycle response object
 contains an `eol` field that takes one of two forms:
 
@@ -336,22 +352,6 @@ emits an A. The full rubric format and additional worked examples are in
 
 When source data is unavailable, the entire cell value is `Insufficient Data` per Rule R2.
 
-
-  for the `(application_id, tech_stack)` pair, as the visually prominent first segment of the cell.
-- The **prior-grade segment** per Rule R3, formatted as `prev: <prior_grade>  |  <ISO 8601 date>`, where
-  `<prior_grade>` is the most recent prior persisted grade and `<ISO 8601 date>` is the prior run's
-  `run_date`. When no prior persistence record exists for the `(application_id, tech_stack)` pair, the
-  prior-grade slot renders the literal value `N/A` per Rule R3 (see also Rule R10 for the heterogeneous
-  run-scope onboarding case in [`./grade-history.md`](./grade-history.md) § Heterogeneous Scope).
-- A **brief multi-line summary** of the detected stack — typically the top languages by % share, the
-  identified cloud providers, and a short count of detected frameworks. The summary text is rendered in
-  business-outcome language for CIO/CTO consumption and avoids implementation jargon.
-
-When source data is unavailable, the **entire cell value** is `Insufficient Data` per Rule R2; the
-prior-grade segment is suppressed for visual clarity per [`./pdf-output.md`](./pdf-output.md) § Cell
-Rendering Format. The full prior-grade record remains queryable via the persistence layer; suppression
-applies only to the rendered cell text.
-
 ## Security Summary
 
 The Security Summary facet characterizes the per-application **known-vulnerability exposure** by
@@ -371,13 +371,13 @@ Critical/High CVE rankings per [`./executive-summary.md`](./executive-summary.md
 - **CycloneDX SBOM** — the intermediate machine-readable artifact produced by the SBOM generators in
   [§ SBOM Generation](#sbom-generation). The SBOM lists all transitive components with their PURL
   (Package URL) identifiers and version constraints, in the CycloneDX JSON format.
-- **NVD CVE API v2.0** — the National Vulnerability Database's REST API at
-  `https://services.nvd.nist.gov`, queried per [§ CVE Lookup via NVD CVE API
-  v2.0](#cve-lookup-via-nvd-cve-api-v20). Optional `NVD_API_KEY` raises the rate limit; canonical
-  contract in [`./api-integrations.md`](./api-integrations.md) § NVD CVE API v2.0.
-- **OSV API v1** — the Open Source Vulnerabilities API at `https://api.osv.dev`, queried per [§ CVE
-  Lookup via OSV API v1](#cve-lookup-via-osv-api-v1). No authentication required; canonical contract
-  in [`./api-integrations.md`](./api-integrations.md) § OSV API v1.
+- **NVD CVE API v2.0** — the National Vulnerability Database's REST API, queried per [§ CVE Lookup
+  via NVD CVE API v2.0](#cve-lookup-via-nvd-cve-api-v20). Optional `NVD_API_KEY` raises the rate limit;
+  canonical contract (base URL, authentication, rate limits) in
+  [`./api-integrations.md`](./api-integrations.md) § NVD CVE API v2.0.
+- **OSV API v1** — the Open Source Vulnerabilities API, queried per [§ CVE Lookup via OSV API
+  v1](#cve-lookup-via-osv-api-v1). No authentication required; canonical contract (base URL, transport,
+  batched-query strategy) in [`./api-integrations.md`](./api-integrations.md) § OSV API v1.
 
 ### Detection Method
 
@@ -416,8 +416,9 @@ SBOM Resilience. If SBOM generation fails for **all** detected ecosystems, the c
 #### CVE Lookup via NVD CVE API v2.0
 
 For each component in the union of per-ecosystem SBOMs, the scanner queries the NVD Vulnerability API
-v2.0 at `https://services.nvd.nist.gov/rest/json/cves/2.0/` for CVE records affecting the component's
-PURL or CPE. Per [`./api-integrations.md`](./api-integrations.md) § NVD CVE API v2.0:
+v2.0 at the documented `/rest/json/cves/2.0/` endpoint per
+[`./api-integrations.md`](./api-integrations.md) § NVD CVE API v2.0 for CVE records affecting the
+component's PURL or CPE. Per [`./api-integrations.md`](./api-integrations.md) § NVD CVE API v2.0:
 
 - The API enforces **offset-based pagination** via `startIndex` and `resultsPerPage` query parameters.
   The scanner walks all pages until the response's `totalResults` count is exhausted.
@@ -433,8 +434,9 @@ and prepared for deduplication with the OSV result set in [§ Deduplication](#de
 
 #### CVE Lookup via OSV API v1
 
-In parallel with the NVD lookup, the scanner queries the OSV API v1 at `https://api.osv.dev` for the
-same SBOM components. Per [`./api-integrations.md`](./api-integrations.md) § OSV API v1:
+In parallel with the NVD lookup, the scanner queries the OSV API v1 per
+[`./api-integrations.md`](./api-integrations.md) § OSV API v1 for the same SBOM components. Per
+[`./api-integrations.md`](./api-integrations.md) § OSV API v1:
 
 - The scanner **prefers `POST /v1/querybatch`** over per-package `POST /v1/query` because the batch
   endpoint is approximately 3x faster and supports up to 1000 packages per request.

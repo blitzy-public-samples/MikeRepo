@@ -71,6 +71,7 @@ duplicating them.
 | `severity_tier_mapping` | object | yes | The canonical CVSS v3.1 base-score-to-tier table. Single source of truth for the CVSS-to-severity translation per [Rule R4](../template.md#r4--cve-severity-breakdown). |
 | `severity_tier_labels` | array of strings | yes | The canonical highest-severity-first label ordering used by the PDF renderer for column ordering within the Security cell. Mirrors `severity_tier_mapping.tiers[].name` exactly. |
 | `rendering_defaults` | object | yes | The cell-rendering format strings, glyph encodings, ISO 8601 date format, and special-state literals (`Insufficient Data`, `N/A`, `Grade: TBD — definition pending`) consumed by the PDF renderer. |
+| `executive_summary` | object | yes | Default caps for the Executive Summary's "Top Critical / High CVE Findings" list (`top_cve_limit`) and "Highest Maturity Risk Applications" list (`top_maturity_limit`). Consumed by the executive-summary aggregator at run time per [`./executive-summary.md`](./executive-summary.md) §§ 4.4 and 5.4. |
 | `references` | object | yes | Package-internal documentation links that consume or describe this file. All paths are relative to the location of `facets.yaml` and resolve within the package. |
 
 ### 2.3 `facets.tech_stack`
@@ -349,16 +350,54 @@ literals from this file rather than embedding them in code.
 - `description` (string, block scalar): Block-scalar prose tying the rendering literals to
   [Rules R2, R3, R5](../template.md#5-rules) and [`./pdf-output.md`](./pdf-output.md).
 
-### 2.10 `references` (Top-Level)
+### 2.10 `executive_summary` (Top-Level)
+
+Default caps for the two ranked lists rendered on page 1 of the PDF: the **Top Critical / High CVE
+Findings** list per [`./executive-summary.md`](./executive-summary.md) § 4.4 Limit, and the **Highest
+Maturity Risk Applications** list per [`./executive-summary.md`](./executive-summary.md) § 5.4 Limit. Both
+caps are stable, deterministic sort/limit operations per
+[`./executive-summary.md`](./executive-summary.md) § 7 Determinism and Idempotency: changing a cap
+produces a different prefix length, but the prefix itself is byte-stable for any given input set.
+
+- `top_cve_limit` (integer, minimum 0): The maximum number of `Critical`/`High` CVE records to render
+  in the **Top Critical / High CVE Findings** list. Default `10` per
+  [`./executive-summary.md`](./executive-summary.md) § 4.4. The cap applies after the four-key sort
+  `(severity desc, cvss_score desc, application_id asc, cve_id asc)` per
+  [`./executive-summary.md`](./executive-summary.md) § 4.3 Ranking. The minimum effective list length is 0
+  (when the run scope contains no `Critical` or `High` findings); the maximum is the value configured here.
+  Authors MAY override at generation time to a smaller value (e.g., `5` for a one-page Executive Summary)
+  or a larger value (e.g., `25` for a portfolio with many `Critical` findings). Override procedure: § 7
+  Modification Cadence and Change Control below.
+- `top_maturity_limit` (integer, minimum 0): The maximum number of applications to render in the
+  **Highest Maturity Risk Applications** list. Default `5` per
+  [`./executive-summary.md`](./executive-summary.md) § 5.4. The cap applies after the three-key sort
+  `(risk_score desc, out_of_support_count desc, application_id asc)` per
+  [`./executive-summary.md`](./executive-summary.md) § 5.3 Ranking. The minimum effective list length is 0
+  (when no applications have detected EOL exposure); the maximum is the value configured here. Authors
+  MAY override at generation time to a smaller value (e.g., `3`) or a larger value (e.g., `10` for a
+  portfolio with broad EOL exposure). Override procedure: § 7 Modification Cadence and Change Control
+  below.
+- `description` (string, block scalar): Block-scalar prose tying the cap defaults to
+  [`./executive-summary.md`](./executive-summary.md) §§ 4.4 and 5.4 and to the configuration override
+  procedure documented here.
+
+The two cap values are read by the executive-summary aggregator at run time per
+[`./executive-summary.md`](./executive-summary.md) § 7. Changing a cap does NOT change the determinism of
+the rendered list (the trailing tie-breakers in §§ 4.3 and 5.3 ensure a stable cut at any cap value); it
+changes only the prefix length. Cf. § 6.3 Cross-File Consistency Invariant 7 below for the cross-document
+consistency contract between this file's defaults and
+[`./executive-summary.md`](./executive-summary.md)'s default-value claims.
+
+### 2.11 `references` (Top-Level)
 
 Package-internal documentation links that consume or describe this file. All paths are relative to the
 location of `facets.yaml` (i.e., `templates/technology-estate-report/config/`) and resolve within the
 package. Default keys are `documentation`, `facets_documentation`, `pdf_output_documentation`,
-`troubleshooting`, `api_integrations`, `template_entry_point`, `rule_r2_canonical_text`,
-`rule_r4_canonical_text`, and `rule_r5_canonical_text`. No path reaches outside the package per the AAP
-§ 0.10.2 "Standalone Package Rule"; no external URL appears in this file.
+`executive_summary_documentation`, `troubleshooting`, `api_integrations`, `template_entry_point`,
+`rule_r2_canonical_text`, `rule_r4_canonical_text`, and `rule_r5_canonical_text`. No path reaches
+outside the package per the AAP § 0.10.2 "Standalone Package Rule"; no external URL appears in this file.
 
-### 2.11 Worked Example
+### 2.12 Worked Example
 
 A minimal but complete YAML excerpt showing the top-level shape of `facets.yaml`. The full canonical file
 is [`../config/facets.yaml`](../config/facets.yaml); the excerpt below shows the structure only:
@@ -438,6 +477,10 @@ rendering_defaults:
   pipe_glyph: "|"
   em_dash_glyph: "—"
   iso_8601_date_format: "YYYY-MM-DD"
+
+executive_summary:
+  top_cve_limit: 10
+  top_maturity_limit: 5
 
 references:
   documentation: "../docs/configuration.md"
@@ -862,6 +905,25 @@ cell value `Insufficient Data` and the persistence-layer enum `InsufficientData`
 to one location without the other is a [Rule R2](../template.md#r2--facet-completeness) +
 [Gate 2](../template.md#612-gate-2--zero-warning-build) verification failure.
 
+**Invariant 7 — Executive Summary cap defaults are byte-for-byte consistent across two locations:**
+
+- `facets.yaml` `executive_summary.top_cve_limit` (numeric default `10`)
+- [`./executive-summary.md`](./executive-summary.md) § 4.4 Limit (default-value claim "the top 10 records by default" with explicit string `top_cve_limit = 10`)
+
+AND
+
+- `facets.yaml` `executive_summary.top_maturity_limit` (numeric default `5`)
+- [`./executive-summary.md`](./executive-summary.md) § 5.4 Limit (default-value claim "the top 5 applications by default" with explicit string `top_maturity_limit = 5`)
+
+The numeric default in [`../config/facets.yaml`](../config/facets.yaml) MUST equal the numeric default
+documented in [`./executive-summary.md`](./executive-summary.md) §§ 4.4 and 5.4. Authors who change a
+default in one location MUST update the other in the same PR, accompanied by a
+[`../CHANGELOG.md`](../CHANGELOG.md) entry under § Changed. The deterministic sort/limit operations in
+[`./executive-summary.md`](./executive-summary.md) § 7 Determinism and Idempotency are preserved at any
+configured value; both caps are stable, deterministic prefixes of the sorted arrays per
+[`./executive-summary.md`](./executive-summary.md) §§ 4.3 and 5.3 Ranking. Adding a new cap key to one
+location without updating the other is a Phase 3.4 cross-reference verification failure.
+
 
 
 ## 7. Modification Cadence and Change Control
@@ -871,7 +933,7 @@ change-control requirements:
 
 | File | Cadence | Change-Control Requirements |
 |---|---|---|
-| [`../config/facets.yaml`](../config/facets.yaml) | Modified rarely. Changes are limited to: (a) CVSS-to-severity tier threshold adjustments (extremely rare; aligned with NIST CVSS revisions); (b) per-facet `insufficient_data_conditions` enumeration; (c) glyph encoding fixes if a UTF-8 transliteration error is detected. | Version-bump `version: "x.y.z"` per change. Add a [`../CHANGELOG.md`](../CHANGELOG.md) entry. Verbatim Rule R3/R4/R5 surfaces (§ 6.3 Invariants 1, 2, 3) MUST NOT be altered without an explicit user request and a corresponding update to [`../template.md`](../template.md). |
+| [`../config/facets.yaml`](../config/facets.yaml) | Modified rarely. Changes are limited to: (a) CVSS-to-severity tier threshold adjustments (extremely rare; aligned with NIST CVSS revisions); (b) per-facet `insufficient_data_conditions` enumeration; (c) glyph encoding fixes if a UTF-8 transliteration error is detected; (d) `executive_summary.top_cve_limit` or `executive_summary.top_maturity_limit` cap-default adjustments (must update [`./executive-summary.md`](./executive-summary.md) §§ 4.4 and 5.4 in the same PR per § 6.3 Invariant 7). | Version-bump `version: "x.y.z"` per change. Add a [`../CHANGELOG.md`](../CHANGELOG.md) entry. Verbatim Rule R3/R4/R5 surfaces (§ 6.3 Invariants 1, 2, 3) MUST NOT be altered without an explicit user request and a corresponding update to [`../template.md`](../template.md). |
 | [`../config/rubric-example.yaml`](../config/rubric-example.yaml) | Modified to add new worked examples for facets, refine illustrative `criteria` strings for clarity, or add per-entry `notes` for documentation purposes. | Version-bump per change. The `complexity: []` array MUST remain empty in this file (Rule R5); the production-ready example with non-empty `complexity` lives in [`../examples/sample-rubric.yaml`](../examples/sample-rubric.yaml). MUST validate against [`../schemas/rubric.schema.json`](../schemas/rubric.schema.json) after any change. |
 | [`../config/allow-list.yaml`](../config/allow-list.yaml) | Modified only via PR with **security reviewer sign-off**. Changes are limited to: (a) adding self-hosted GitHub Enterprise / GitLab CE hosts per § 4.6; (b) extending the `denied_categories` examples list with new SaaS vendor patterns to reject; (c) tightening the `enforcement` configuration. | Version-bump per change. PR description MUST cite the [Rule R6](../template.md#r6--saas-data-sourcing) implication of the change. Adding any SaaS vendor host or any host outside the documented purpose categories (source repository ingestion, EOL lookup, CVE lookup) is **prohibited** per § 4.7. Add a [`../CHANGELOG.md`](../CHANGELOG.md) entry. |
 | [`../examples/sample-rubric.yaml`](../examples/sample-rubric.yaml) | Modified freely as the production-ready example evolves. Not version-pinned. | MUST validate against [`../schemas/rubric.schema.json`](../schemas/rubric.schema.json). The production-ready example MAY contain a non-empty `complexity` array demonstrating the unlocked state per Rule R5. Changes are documented inline as YAML comments rather than in a separate changelog entry. |
