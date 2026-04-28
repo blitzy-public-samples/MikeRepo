@@ -125,7 +125,7 @@ single source of truth for provider detection; the machine-readable copy is in
 |---|---|---|---|
 | AWS | `aws_*` | `AWS::*` | `app.kubernetes.io/cloud=aws` |
 | Azure | `azurerm_*`, `azapi_*` | `Microsoft.*` | `cloud.provider=azure` |
-| GCP | `google_*` | n/a | `app.kubernetes.io/cloud=gcp` |
+| GCP | `google_*` | N/A | `app.kubernetes.io/cloud=gcp` |
 
 The output is a deduplicated set of detected providers (e.g., `{aws}`, `{aws, azure}`, `{}` if no IaC
 configurations are present). Multi-cloud detection is supported by design — a repository with both

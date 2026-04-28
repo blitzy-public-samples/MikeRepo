@@ -943,8 +943,8 @@ the severity tier counts. Example layout:
 
 ```text
 B  ←  prev: C  |  2025-09-01
-Critical: 0  |  High: 1  |  Medium: 3  |  Low: 5  |  Total: 9
-Scan: 2025-10-01T08:00:00Z  |  Source: NVD, OSV
+Critical: 0 | High: 1 | Medium: 3 | Low: 5 | Total: 9
+Scan: 2025-10-01T08:00:00Z | Source: NVD, OSV
 ```
 
 **Option B — Aggregated footnote (allowed when uniform):** When ALL Security cells in a single run share the

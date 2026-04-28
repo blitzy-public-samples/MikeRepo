@@ -432,7 +432,7 @@ The following phrasings are admitted and recommended for the rendered Executive 
 - "Critical security findings" instead of "Critical CVEs" (the CVE token is permitted in the Top CVE Findings sub-section's table because the column header `CVE ID` references the canonical CVE identifier format, but is otherwise reserved for implementation-facing pages)
 - "Improved versus prior run" instead of "Positive delta"
 - "No baseline established" instead of "No prior persistence record"
-- "Insufficient data" instead of "Manifest parse error" or "API lookup failure"
+- "Insufficient Data" instead of "Manifest parse error" or "API lookup failure"
 
 The validation harness does NOT structurally enforce these phrasings — they are an editorial convention. Per [Gate 1](../template.md#611-gate-1--end-to-end-boundary-verification) (live smoke test), the generated PDF is reviewed by a CIO/CTO-level reviewer who confirms the language conforms to this convention; per [`./validation.md`](./validation.md) § Gate 1, this review is part of the manual sign-off step.
 
