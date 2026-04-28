@@ -208,14 +208,10 @@ author follows when one of these failures occurs.
   than the one whose repositories are in scope.
 - **Remediation:** regenerate the GitHub PAT per [`./usage.md`](./usage.md) § 3 Provisioning Credentials;
   ensure the `repo` scope (classic) or the `Contents: Read-only` permission (fine-grained) is granted;
-  verify the token by issuing the probe request `GET /user`:
-
-  ```bash
-  curl -H "Authorization: Bearer $GITHUB_TOKEN" https://api.github.com/user
-  ```
-
-  A successful probe returns the authenticated user's profile JSON with `login` and `id` keys; a failed
-  probe returns `401` and the regenerated token must itself be regenerated.
+  verify the token by issuing the canonical token-verification probe documented in
+  [`./api-integrations.md`](./api-integrations.md) § 2.10 Token Verification Probe. A successful probe
+  returns the authenticated user's profile JSON with `login` and `id` keys; a failed probe returns `401`
+  and the regenerated token must itself be regenerated.
 - **Cell impact:** ALL FOUR cells for the affected application(s) render `Insufficient Data` per the
   per-application failure rule in [§ 2.1](#21-distinction-facet-level-vs-application-level-insufficient-data).
   The affected application(s) are exactly those repositories the failed token was used to access; other
@@ -246,15 +242,10 @@ author follows when one of these failures occurs.
   GitLab host).
 - **Causes:** the GitLab PAT has expired, has been revoked, or has been malformed during transcription.
 - **Remediation:** regenerate the GitLab PAT per [`./usage.md`](./usage.md) § 3 Provisioning Credentials;
-  ensure the `read_api` and `read_repository` scopes are granted; verify by issuing the probe request
-  `GET /api/v4/user`:
-
-  ```bash
-  curl -H "PRIVATE-TOKEN: $GITLAB_TOKEN" https://gitlab.com/api/v4/user
-  ```
-
-  A successful probe returns the authenticated user's profile JSON with `username` and `id` keys; a
-  failed probe returns `401` and the token must itself be regenerated.
+  ensure the `read_api` and `read_repository` scopes are granted; verify by issuing the canonical
+  token-verification probe documented in [`./api-integrations.md`](./api-integrations.md) § 3.10 Token
+  Verification Probe. A successful probe returns the authenticated user's profile JSON with `username` and
+  `id` keys; a failed probe returns `401` and the token must itself be regenerated.
 - **Cell impact:** ALL FOUR cells for each affected GitLab application render `Insufficient Data`.
   GitHub-hosted applications in the same run scope are unaffected.
 

@@ -154,6 +154,40 @@ X-RateLimit-Reset: 1759320000
 Authoritative GitHub REST API reference: `https://docs.github.com/en/rest`.
 Authoritative GitHub GraphQL API reference: `https://docs.github.com/en/graphql`.
 
+### 2.10 Token Verification Probe
+
+The canonical operational command for verifying that a `GITHUB_TOKEN` is correctly provisioned and grants the required
+read scope is the authenticated `GET /user` probe against the base URL documented in § 2.2. The canonical command form is:
+
+```bash
+curl -H "Authorization: Bearer $GITHUB_TOKEN" https://api.github.com/user
+```
+
+A successful probe returns the authenticated user's profile JSON with `login` and `id` keys. A `401 Unauthorized`
+response indicates the token is invalid or expired; a `403 Forbidden` response indicates insufficient scope. This
+command is referenced by:
+
+- [`./usage.md`](./usage.md) § 3 Provisioning Credentials (token-provisioning workflow)
+- [`./troubleshooting.md`](./troubleshooting.md) § 4.1 GitHub Token Invalid (HTTP 401) (diagnostic recovery)
+
+For GitHub Enterprise Server installations, replace the `https://api.github.com` host portion with the
+`<enterprise_host>/api/v3` base URL configured per § 2.2 and added to the network-egress allow-list per
+[`../config/allow-list.yaml`](../config/allow-list.yaml) `allowed_hosts[id=github_api].host`.
+
+### 2.11 Canonical Test Endpoint (Gate 8 Item 2)
+
+The canonical request used by [Gate 8 Item 2 — API Contract Verification](./validation.md#44-item-2-api-contract-verification)
+to verify the GitHub REST API contract is the repository-metadata endpoint against the well-known stable repository
+`octocat/Hello-World`:
+
+```text
+GET https://api.github.com/repos/octocat/Hello-World
+```
+
+The response shape MUST contain the contract-documented top-level keys `id`, `name`, `full_name`, `default_branch`,
+`archived`, and `language` (per the representative response in § 2.8). A response that lacks any of these keys, or
+that returns a status other than `200 OK`, fails Gate 8 Item 2 and triggers a contract update per § 2.8.
+
 ## 3. GitLab API
 
 ### 3.1 Purpose
@@ -256,6 +290,41 @@ Accept: application/json
 ### 3.9 Reference Documentation
 
 Authoritative GitLab REST API reference: `https://docs.gitlab.com/ee/api/`.
+
+### 3.10 Token Verification Probe
+
+The canonical operational command for verifying that a `GITLAB_TOKEN` is correctly provisioned and grants the required
+read scopes is the authenticated `GET /api/v4/user` probe against the base URL documented in § 3.2. The canonical
+command form for GitLab.com is:
+
+```bash
+curl --header "PRIVATE-TOKEN: $GITLAB_TOKEN" https://gitlab.com/api/v4/user
+```
+
+A successful probe returns the authenticated user's profile JSON with `username` and `id` keys. A `401 Unauthorized`
+response indicates the token is invalid or expired; a `403 Forbidden` response indicates insufficient scope. This
+command is referenced by:
+
+- [`./usage.md`](./usage.md) § 3.2 GitLab PAT (token-provisioning workflow)
+- [`./troubleshooting.md`](./troubleshooting.md) § 4.3 GitLab Token Invalid (HTTP 401) (diagnostic recovery)
+
+For self-hosted GitLab CE/EE installations, replace the `https://gitlab.com` host portion with your instance's base URL
+(per § 3.2) and add the host to the network-egress allow-list per
+[`../config/allow-list.yaml`](../config/allow-list.yaml) `allowed_hosts[id=gitlab_api].host` for that deployment.
+
+### 3.11 Canonical Test Endpoint (Gate 8 Item 2)
+
+The canonical request used by [Gate 8 Item 2 — API Contract Verification](./validation.md#44-item-2-api-contract-verification)
+to verify the GitLab REST API contract is the project-metadata endpoint against a known-public GitLab.com project:
+
+```text
+GET https://gitlab.com/api/v4/projects/<known-public-project-id>
+```
+
+The `<known-public-project-id>` placeholder is the URL-encoded project ID of any public GitLab.com project (the
+canonical form is `org%2Frepo`, e.g., `gitlab-org%2Fgitlab`). The response shape MUST contain the contract-documented
+top-level keys `id`, `name`, `path_with_namespace`, `default_branch`, `archived`, and `visibility` per § 3.8. A
+response that lacks any of these keys, or that returns a status other than `200 OK`, fails Gate 8 Item 2.
 
 ## 4. endoflife.date API v1
 
@@ -375,6 +444,20 @@ A representative response excerpt:
 ### 4.10 Reference Documentation
 
 Authoritative endoflife.date API v1 reference: `https://endoflife.date/docs/api/v1/`.
+
+### 4.11 Canonical Test Endpoint (Gate 8 Item 2)
+
+The canonical request used by [Gate 8 Item 2 — API Contract Verification](./validation.md#44-item-2-api-contract-verification)
+to verify the endoflife.date API v1 contract is the product endpoint for the well-known stable product `python`:
+
+```text
+GET https://endoflife.date/api/v1/products/python/
+```
+
+The response shape MUST contain the contract-documented JSON array of release entries with per-release keys including
+at minimum `cycle`, `eol`, and `latest` (per § 4.9). A response that lacks any of these keys, or that returns a status
+other than `200 OK`, fails Gate 8 Item 2 — and given the API beta-status caveat per § 4.5, also triggers a contract
+update review.
 
 ## 5. NVD CVE API v2.0
 
@@ -543,6 +626,20 @@ A representative CVE-record excerpt:
 
 Authoritative NVD CVE API v2.0 reference: `https://nvd.nist.gov/developers/vulnerabilities`.
 
+### 5.12 Canonical Test Endpoint (Gate 8 Item 2)
+
+The canonical request used by [Gate 8 Item 2 — API Contract Verification](./validation.md#44-item-2-api-contract-verification)
+to verify the NVD CVE API v2.0 contract is the single-CVE retrieval for the well-known stable Apache Struts
+vulnerability `CVE-2017-5638`:
+
+```text
+GET https://services.nvd.nist.gov/rest/json/cves/2.0?cveId=CVE-2017-5638
+```
+
+The CVE-2017-5638 record is a stable, well-known vulnerability suitable as a test query because its CVSS v3.1 base
+score and severity classification are settled. The response shape MUST contain the contract-documented top-level keys
+`vulnerabilities[]`, `resultsPerPage`, and `totalResults` per § 5.10. A response that lacks any of these keys, or that
+returns a status other than `200 OK`, fails Gate 8 Item 2.
 
 ## 6. OSV API v1
 
@@ -698,6 +795,26 @@ A representative response excerpt:
 
 Authoritative OSV API v1 reference: `https://google.github.io/osv.dev/api/`.
 
+### 6.11 Canonical Test Endpoint (Gate 8 Item 2)
+
+The canonical request used by [Gate 8 Item 2 — API Contract Verification](./validation.md#44-item-2-api-contract-verification)
+to verify the OSV API v1 contract is the `POST /v1/query` single-package vulnerability lookup for a well-known
+stable vulnerable package:
+
+```text
+POST https://api.osv.dev/v1/query
+Content-Type: application/json
+
+{
+  "package": { "name": "log4j", "ecosystem": "Maven" },
+  "version": "2.14.0"
+}
+```
+
+The Maven `log4j` 2.14.0 record is a stable, well-known vulnerable version (Log4Shell / CVE-2021-44228 family)
+suitable as a test query. The response shape MUST contain the contract-documented top-level `vulns[]` array, with
+each entry containing `id`, `summary`, and `severity[]` per § 6.9. A response that lacks the `vulns[]` array
+structure, or that returns a status other than `200 OK`, fails Gate 8 Item 2.
 
 ## 7. Network Egress Allow-List (Rule R6)
 

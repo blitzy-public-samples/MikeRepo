@@ -255,16 +255,19 @@ Reviewer Verification Procedure:
 1. Provision `GITHUB_TOKEN` per [`./usage.md`](./usage.md) § 3 (and optionally `GITLAB_TOKEN` and
    `NVD_API_KEY` if the chosen test scope exercises those APIs).
 2. Run the command in [§ 4.4 Item 2: API Contract Verification](#44-item-2-api-contract-verification). The
-   command issues one canonical request to each external API. Suggested canonical requests (the validator
-   selects equivalent endpoints if the underlying API documentation has updated):
-   - `GET https://api.github.com/repos/octocat/Hello-World` (GitHub REST API)
-   - `GET https://gitlab.com/api/v4/projects/<known-public-project-id>` (GitLab REST API; SKIP if no
-     `GITLAB_TOKEN` provisioned)
-   - `GET https://endoflife.date/api/v1/products/python/` (endoflife.date API v1)
-   - `GET https://services.nvd.nist.gov/rest/json/cves/2.0?cveId=CVE-2017-5638` (NVD CVE API v2.0; the
-     CVE-2017-5638 record is a stable, well-known Apache Struts vulnerability suitable as a test query)
-   - `POST https://api.osv.dev/v1/query` with body `{"package":{"name":"log4j","ecosystem":"Maven"},"version":"2.14.0"}`
-     (OSV API v1)
+   command issues one canonical request to each external API. The canonical test endpoint for each API is
+   documented in `api-integrations.md` (the validator selects equivalent endpoints if the underlying API
+   documentation has updated):
+   - GitHub REST API repository-metadata endpoint per [`./api-integrations.md`](./api-integrations.md)
+     § 2.11 Canonical Test Endpoint (Gate 8 Item 2)
+   - GitLab REST API project-metadata endpoint per [`./api-integrations.md`](./api-integrations.md)
+     § 3.11 Canonical Test Endpoint (Gate 8 Item 2) — SKIP if no `GITLAB_TOKEN` provisioned
+   - endoflife.date API v1 product endpoint per [`./api-integrations.md`](./api-integrations.md)
+     § 4.11 Canonical Test Endpoint (Gate 8 Item 2)
+   - NVD CVE API v2.0 single-CVE retrieval per [`./api-integrations.md`](./api-integrations.md)
+     § 5.12 Canonical Test Endpoint (Gate 8 Item 2)
+   - OSV API v1 single-package vulnerability lookup per [`./api-integrations.md`](./api-integrations.md)
+     § 6.11 Canonical Test Endpoint (Gate 8 Item 2)
 3. For each response, assert that the documented JSON keys per [`./api-integrations.md`](./api-integrations.md)
    are present and have the documented types. Specifically: the validator expects the contract-documented
    top-level keys, the documented enumerations for status/severity fields, and the documented date-time

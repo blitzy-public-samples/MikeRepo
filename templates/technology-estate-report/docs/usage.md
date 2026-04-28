@@ -93,15 +93,11 @@ To provision the GitHub Personal Access Token, follow these steps:
    export GITHUB_TOKEN="ghp_<example_placeholder>"
    ```
 
-6. Verify the token works by issuing a probe request to the GitHub user endpoint:
-
-   ```bash
-   curl -H "Authorization: Bearer $GITHUB_TOKEN" https://api.github.com/user
-   ```
-
-   The response should be a JSON object with the authenticated user's profile. A `401 Unauthorized` response
-   indicates the token is invalid or expired; a `403 Forbidden` indicates insufficient scope; a successful
-   response confirms the token is correctly provisioned for repository ingestion.
+6. Verify the token works by issuing the canonical token-verification probe documented in
+   [`./api-integrations.md`](./api-integrations.md) § 2.10 Token Verification Probe. A successful probe returns
+   a JSON object with the authenticated user's profile. A `401 Unauthorized` response indicates the token is invalid
+   or expired; a `403 Forbidden` indicates insufficient scope; a successful response confirms the token is correctly
+   provisioned for repository ingestion.
 
 ### 3.2 GitLab PAT
 
@@ -118,16 +114,12 @@ To provision the GitLab Personal Access Token, follow these steps:
    export GITLAB_TOKEN="glpat-<example_placeholder>"
    ```
 
-6. Verify the token works by issuing a probe request to the GitLab user endpoint:
-
-   ```bash
-   curl --header "PRIVATE-TOKEN: $GITLAB_TOKEN" https://gitlab.com/api/v4/user
-   ```
-
-   The response should be a JSON object with the authenticated user's profile. A `401 Unauthorized` response
-   indicates the token is invalid or expired; a `403 Forbidden` indicates insufficient scope. For self-hosted
-   GitLab CE installations, replace `https://gitlab.com` with your instance's base URL; the per-entry scope
-   override convention for self-hosted instances is documented in [`./configuration.md`](./configuration.md).
+6. Verify the token works by issuing the canonical token-verification probe documented in
+   [`./api-integrations.md`](./api-integrations.md) § 3.10 Token Verification Probe. A successful probe returns
+   a JSON object with the authenticated user's profile. A `401 Unauthorized` response indicates the token is invalid
+   or expired; a `403 Forbidden` indicates insufficient scope. For self-hosted GitLab CE installations, the host
+   substitution procedure is documented in § 3.10 of `api-integrations.md`; the per-entry scope override convention
+   for self-hosted instances is documented in [`./configuration.md`](./configuration.md).
 
 ### 3.3 NVD API Key (Optional but Recommended)
 

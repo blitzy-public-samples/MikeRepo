@@ -122,7 +122,7 @@ denied_categories:
   # 4.1 SaaS vendor endpoints (Rule R6) — explicitly denied
   # -------------------------------------------------------------------------
   - id: saas_vendor_endpoints
-    description: "Live SaaS vendor API endpoints are explicitly denied per Rule R6. SaaS license data MUST be sourced exclusively from manifests tracked in the repository. The examples list below is illustrative and NOT exhaustive — ANY live SaaS vendor endpoint is denied unless and until it is explicitly added to allowed_hosts in a future package version. Verification per Rule R6: 'template execution produces no outbound calls to SaaS vendor endpoints.'"
+    description: "Per Rule R6 (SaaS data sourcing), SaaS license data is sourced exclusively from repository manifests; live SaaS vendor API endpoints are denied here — see ../template.md § 5 Rules R6 for the canonical rule statement and verification procedure. The examples list below is illustrative and NOT exhaustive — ANY live SaaS vendor endpoint is denied unless and until it is explicitly added to allowed_hosts in a future package version."
     examples:
       - login.salesforce.com
       - "*.my.salesforce.com"
