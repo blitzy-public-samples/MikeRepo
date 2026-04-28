@@ -147,20 +147,20 @@ Markdown tables use the bare pipe character `|` as the column separator. Where c
 >
 > ### 5. Trend vs Prior Run
 >
-> The table below compares Run 3 grades (`2025-11-01`) against the most recent prior-run grades (`2025-10-01`) for every `(application_id, facet)` pair that has a prior record. Trend values are drawn from the [`../schemas/report-output.schema.json`](../schemas/report-output.schema.json) `trendStatus` enum: `improved`, `regressed`, `no_change`, `no_baseline`.
+> The table below compares Run 3 grades (`2025-11-01`) against the most recent prior-run grades (`2025-10-01`) for every `(application_id, facet)` pair that has a prior record. Trend labels are drawn from [`../docs/executive-summary.md`](../docs/executive-summary.md) § 6.5 Rendering: `Improved`, `Regressed`, `No Change`, `No Baseline`. These labels map one-to-one to the schema's count-bucket field names `net_improvements`, `net_regressions`, `unchanged`, `no_prior_run` per [`../schemas/report-output.schema.json`](../schemas/report-output.schema.json) `#/$defs/trendVersusPriorRun` — the schema records aggregate counts at the portfolio level while the per-pair table below uses the canonical rendering labels for the same four buckets.
 >
 > | Application | Facet | Prior Grade (2025-10-01) | Current Grade (2025-11-01) | Trend |
 > |---|---|---|---|---|
-> | acme-inc/acme-api | Tech Stack | B | A | improved |
-> | acme-inc/acme-api | Maturity | B | A | improved |
-> | acme-inc/acme-api | Security | D | C | improved |
-> | acme-inc/acme-api | Complexity | TBD | TBD | no_change |
-> | internal-tools/log-aggregator | Tech Stack | C | C | no_change |
-> | internal-tools/log-aggregator | Maturity | D | C | improved |
-> | internal-tools/log-aggregator | Security | Insufficient Data | B | improved |
-> | internal-tools/log-aggregator | Complexity | TBD | TBD | no_change |
+> | acme-inc/acme-api | Tech Stack | B | A | Improved |
+> | acme-inc/acme-api | Maturity | B | A | Improved |
+> | acme-inc/acme-api | Security | D | C | Improved |
+> | acme-inc/acme-api | Complexity | TBD | TBD | No Change |
+> | internal-tools/log-aggregator | Tech Stack | C | C | No Change |
+> | internal-tools/log-aggregator | Maturity | D | C | Improved |
+> | internal-tools/log-aggregator | Security | Insufficient Data | B | Improved |
+> | internal-tools/log-aggregator | Complexity | TBD | TBD | No Change |
 >
-> **Net portfolio movement vs prior run:** 5 facet-application pairs improved, 0 regressed, 3 no_change. No regressions were observed in this run.
+> **Net portfolio movement vs prior run:** 5 facet-application pairs Improved, 0 Regressed, 3 No Change. No regressions were observed in this run.
 >
 > ──────────────────── END PDF PAGE 1 ────────────────────
 
@@ -193,7 +193,7 @@ The Security cell is the only cell that renders three lines per Rule R4 + Rule R
 
 Both Complexity cells render the verbatim placeholder string `Grade: TBD — definition pending` followed by the raw proxy metrics (LOC, file count, contributor count). No A–F letter grade appears in either Complexity cell — Rule R5 prohibits backfill until an explicit Complexity rubric is supplied by the user.
 
-Real rendered PDFs may apply cell coloring (green for A/B, amber for C, red for D/F, gray for `TBD` / `Insufficient Data`) per the optional treatment documented in [`../docs/pdf-output.md`](../docs/pdf-output.md) § 6.2. This Markdown mockup deliberately has no color so that a reviewer focuses on cell content and section ordering.
+Real rendered PDFs may apply cell coloring (green for A/B, amber for C, red for D/F, gray for `TBD` / `Insufficient Data`) as an optional treatment chosen by the PDF renderer at runtime. This Markdown mockup deliberately has no color so that a reviewer focuses on cell content and section ordering.
 
 ---
 
@@ -225,7 +225,7 @@ This run successfully processed 1 previously-ingested repository (`acme-inc/acme
 
 The `internal-tools/log-aggregator` Security cell illustrates the `Insufficient Data` recovery path required by Rule R2 and Gate 2. In Run 2, this cell rendered the literal `Insufficient Data` because the SBOM generation step timed out for the application's Python ecosystem manifests, preventing the CVE scanner from producing severity counts. The failure was surfaced as an explicit cell value (not a silent omission) per Gate 2's prohibition on suppressed errors, and the failure reason was persisted in the grade-history record.
 
-In Run 3, the SBOM generation succeeded and the cell renders a `B` current grade with `Insufficient Data` in the prior-grade slot. The full recovery procedure — including how to diagnose the underlying failure, how to retry, and how the next run automatically picks up the recovered data — is documented in [`../docs/troubleshooting.md`](../docs/troubleshooting.md) § 4.2.
+In Run 3, the SBOM generation succeeded and the cell renders a `B` current grade with `Insufficient Data` in the prior-grade slot. The full recovery procedure — including how to diagnose the underlying failure, how to retry, and how the next run automatically picks up the recovered data — is documented in [`../docs/troubleshooting.md`](../docs/troubleshooting.md) § 7.3.
 
 This is the only `Insufficient Data` recovery in this run; no other facet/application pair had an `Insufficient Data` prior grade that subsequently resolved.
 
