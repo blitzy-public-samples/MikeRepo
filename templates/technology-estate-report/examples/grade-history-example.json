@@ -1,0 +1,481 @@
+{
+  "description": "Sample grade-history persistence records for the Technology Estate Report template (technology-estate-report v0.1.0). This file demonstrates the three-sequential-runs worked example documented in ../docs/grade-history.md § 8: Run 1 (2025-09-01T08:00:00Z) ingests acme-inc/acme-api alone (4 records, one per facet); Run 2 (2025-10-01T08:00:00Z) adds the net-new repo internal-tools/log-aggregator alongside acme-inc/acme-api (8 new records); Run 3 (2025-11-01T08:00:00Z) processes both repos again (8 new records). Total: 20 records demonstrating Rule R3 (grade history fidelity), Rule R7 (org/repo identity stability), Rule R9 (CVE attribution via scan_metadata for security records), Rule R10 (heterogeneous-scope new-repo compatibility), and the domain success criterion of continuous unbroken grade history across three sequential runs. Each record in the records array validates individually against ../schemas/grade-history.schema.json (Draft 2020-12, $id urn:blitzy:technology-estate-report:grade-history:v0.1.0). The wrapper object {description, records} is a structural carrier only — downstream tooling iterates records[] and validates each element against the schema independently. This file is referenced from ../docs/grade-history.md § 8 (Worked Example: Three Sequential Runs), ../docs/grade-history.md § 9 (Schema Reference), ../docs/pdf-output.md § 8 (Output Schema Reference), ../docs/validation.md § Gate 8 Item 3 (Grade History Verification), and ../README.md (file map). The CVE identifiers and package names in the top_findings arrays are illustrative — they represent plausible vulnerability data for a sample report and need not correspond to real, currently-public CVEs.",
+  "records": [
+    {
+      "application_id": "acme-inc/acme-api",
+      "facet": "tech_stack",
+      "run_date": "2025-09-01T08:00:00Z",
+      "grade": "B",
+      "raw_data": {
+        "language_share": {
+          "TypeScript": 72,
+          "JavaScript": 18,
+          "YAML": 6,
+          "Dockerfile": 4
+        },
+        "cloud_providers": ["aws"],
+        "frameworks": ["express", "react", "jest"],
+        "total_files": 412
+      }
+    },
+    {
+      "application_id": "acme-inc/acme-api",
+      "facet": "maturity",
+      "run_date": "2025-09-01T08:00:00Z",
+      "grade": "A",
+      "raw_data": {
+        "runtime": {
+          "node": "20.11.0",
+          "endoflife_status": "supported",
+          "eol_date": "2026-04-30"
+        },
+        "dependencies_total": 184,
+        "dependencies_eol": 0,
+        "dependencies_within_6_months_eol": 2,
+        "eol_percent": 0.0,
+        "rubric_rationale": "No library out of support = A for Maturity"
+      }
+    },
+    {
+      "application_id": "acme-inc/acme-api",
+      "facet": "security",
+      "run_date": "2025-09-01T08:00:00Z",
+      "grade": "C",
+      "raw_data": {
+        "cve_counts": {
+          "Critical": 1,
+          "High": 3,
+          "Medium": 7,
+          "Low": 12,
+          "total": 23
+        },
+        "top_findings": [
+          {
+            "cve_id": "CVE-2024-29415",
+            "severity": "Critical",
+            "package": "ip",
+            "version": "2.0.0",
+            "source": "NVD"
+          },
+          {
+            "cve_id": "CVE-2024-37890",
+            "severity": "High",
+            "package": "ws",
+            "version": "8.16.0",
+            "source": "OSV"
+          },
+          {
+            "cve_id": "CVE-2024-21538",
+            "severity": "High",
+            "package": "cross-spawn",
+            "version": "7.0.3",
+            "source": "NVD"
+          },
+          {
+            "cve_id": "CVE-2024-39338",
+            "severity": "High",
+            "package": "axios",
+            "version": "1.7.0",
+            "source": "OSV"
+          }
+        ],
+        "sbom_format": "CycloneDX 1.6"
+      },
+      "scan_metadata": {
+        "timestamp": "2025-09-01T08:02:14Z",
+        "sources": ["NVD", "OSV"]
+      }
+    },
+    {
+      "application_id": "acme-inc/acme-api",
+      "facet": "complexity",
+      "run_date": "2025-09-01T08:00:00Z",
+      "grade": "TBD",
+      "raw_data": {
+        "loc": 12450,
+        "file_count": 187,
+        "contributor_count": 8,
+        "placeholder_label": "Grade: TBD — definition pending"
+      }
+    },
+    {
+      "application_id": "acme-inc/acme-api",
+      "facet": "tech_stack",
+      "run_date": "2025-10-01T08:00:00Z",
+      "grade": "B",
+      "raw_data": {
+        "language_share": {
+          "TypeScript": 73,
+          "JavaScript": 17,
+          "YAML": 6,
+          "Dockerfile": 4
+        },
+        "cloud_providers": ["aws"],
+        "frameworks": ["express", "react", "jest"],
+        "total_files": 425
+      }
+    },
+    {
+      "application_id": "acme-inc/acme-api",
+      "facet": "maturity",
+      "run_date": "2025-10-01T08:00:00Z",
+      "grade": "B",
+      "raw_data": {
+        "runtime": {
+          "node": "20.11.0",
+          "endoflife_status": "supported",
+          "eol_date": "2026-04-30"
+        },
+        "dependencies_total": 186,
+        "dependencies_eol": 0,
+        "dependencies_within_6_months_eol": 5,
+        "eol_percent": 0.0,
+        "regression_rationale": "Five additional dependencies aged into the <6-month EOL window since the previous run; runtime remains supported."
+      }
+    },
+    {
+      "application_id": "acme-inc/acme-api",
+      "facet": "security",
+      "run_date": "2025-10-01T08:00:00Z",
+      "grade": "D",
+      "raw_data": {
+        "cve_counts": {
+          "Critical": 2,
+          "High": 6,
+          "Medium": 9,
+          "Low": 14,
+          "total": 31
+        },
+        "top_findings": [
+          {
+            "cve_id": "CVE-2024-29415",
+            "severity": "Critical",
+            "package": "ip",
+            "version": "2.0.0",
+            "source": "NVD"
+          },
+          {
+            "cve_id": "CVE-2024-45296",
+            "severity": "Critical",
+            "package": "path-to-regexp",
+            "version": "6.2.1",
+            "source": "OSV"
+          },
+          {
+            "cve_id": "CVE-2024-37890",
+            "severity": "High",
+            "package": "ws",
+            "version": "8.16.0",
+            "source": "OSV"
+          },
+          {
+            "cve_id": "CVE-2024-21538",
+            "severity": "High",
+            "package": "cross-spawn",
+            "version": "7.0.3",
+            "source": "NVD"
+          },
+          {
+            "cve_id": "CVE-2024-39338",
+            "severity": "High",
+            "package": "axios",
+            "version": "1.7.0",
+            "source": "OSV"
+          },
+          {
+            "cve_id": "CVE-2024-43799",
+            "severity": "High",
+            "package": "send",
+            "version": "0.18.0",
+            "source": "NVD"
+          },
+          {
+            "cve_id": "CVE-2024-43800",
+            "severity": "High",
+            "package": "serve-static",
+            "version": "1.15.0",
+            "source": "NVD"
+          },
+          {
+            "cve_id": "CVE-2024-47764",
+            "severity": "High",
+            "package": "cookie",
+            "version": "0.6.0",
+            "source": "OSV"
+          }
+        ],
+        "sbom_format": "CycloneDX 1.6"
+      },
+      "scan_metadata": {
+        "timestamp": "2025-10-01T08:02:43Z",
+        "sources": ["NVD", "OSV"]
+      }
+    },
+    {
+      "application_id": "acme-inc/acme-api",
+      "facet": "complexity",
+      "run_date": "2025-10-01T08:00:00Z",
+      "grade": "TBD",
+      "raw_data": {
+        "loc": 12780,
+        "file_count": 192,
+        "contributor_count": 9,
+        "placeholder_label": "Grade: TBD — definition pending"
+      }
+    },
+    {
+      "application_id": "internal-tools/log-aggregator",
+      "facet": "tech_stack",
+      "run_date": "2025-10-01T08:00:00Z",
+      "grade": "C",
+      "raw_data": {
+        "language_share": {
+          "Python": 64,
+          "Go": 22,
+          "YAML": 8,
+          "Dockerfile": 6
+        },
+        "cloud_providers": ["aws", "gcp"],
+        "frameworks": ["fastapi", "celery", "pytest"],
+        "total_files": 163,
+        "first_run_for_repo": true,
+        "first_run_rationale": "This repository was net-new in Run 2 per Rule R10; no Run 1 record exists for this application_id."
+      }
+    },
+    {
+      "application_id": "internal-tools/log-aggregator",
+      "facet": "maturity",
+      "run_date": "2025-10-01T08:00:00Z",
+      "grade": "D",
+      "raw_data": {
+        "runtime": {
+          "python": "3.8",
+          "endoflife_status": "eol",
+          "eol_date": "2024-10-07"
+        },
+        "dependencies_total": 97,
+        "dependencies_eol": 28,
+        "eol_percent": 28.9,
+        "regression_rationale": "Primary runtime (Python 3.8) reached EOL on 2024-10-07; 28 of 97 dependencies are out-of-support per endoflife.date lookup."
+      }
+    },
+    {
+      "application_id": "internal-tools/log-aggregator",
+      "facet": "security",
+      "run_date": "2025-10-01T08:00:00Z",
+      "grade": "InsufficientData",
+      "raw_data": {
+        "failure_reason": "SBOM generation timed out for the Python ecosystem after 3 retries; CVE counts cannot be computed without a complete SBOM. See ../docs/troubleshooting.md § 7.3.",
+        "attempted_ecosystems": ["python", "go"],
+        "completed_ecosystems": ["go"],
+        "failed_ecosystems": ["python"],
+        "render_label": "Insufficient Data"
+      },
+      "scan_metadata": {
+        "timestamp": "2025-10-01T08:05:11Z",
+        "sources": ["NVD", "OSV"]
+      }
+    },
+    {
+      "application_id": "internal-tools/log-aggregator",
+      "facet": "complexity",
+      "run_date": "2025-10-01T08:00:00Z",
+      "grade": "TBD",
+      "raw_data": {
+        "loc": 8420,
+        "file_count": 141,
+        "contributor_count": 5,
+        "placeholder_label": "Grade: TBD — definition pending"
+      }
+    },
+    {
+      "application_id": "acme-inc/acme-api",
+      "facet": "tech_stack",
+      "run_date": "2025-11-01T08:00:00Z",
+      "grade": "A",
+      "raw_data": {
+        "language_share": {
+          "TypeScript": 86,
+          "JavaScript": 5,
+          "YAML": 6,
+          "Dockerfile": 3
+        },
+        "cloud_providers": ["aws"],
+        "frameworks": ["express", "react", "jest"],
+        "total_files": 438,
+        "improvement_rationale": "Refactor migrated remaining JavaScript modules to TypeScript, raising primary-language share above the rubric's 85% threshold for grade A."
+      }
+    },
+    {
+      "application_id": "acme-inc/acme-api",
+      "facet": "maturity",
+      "run_date": "2025-11-01T08:00:00Z",
+      "grade": "A",
+      "raw_data": {
+        "runtime": {
+          "node": "20.18.0",
+          "endoflife_status": "supported",
+          "eol_date": "2026-04-30"
+        },
+        "dependencies_total": 188,
+        "dependencies_eol": 0,
+        "dependencies_within_6_months_eol": 1,
+        "eol_percent": 0.0,
+        "improvement_rationale": "Dependency upgrades shipped during October reduced the <6-month-EOL window count from 5 to 1; runtime patched to 20.18.0; zero out-of-support dependencies → grade A."
+      }
+    },
+    {
+      "application_id": "acme-inc/acme-api",
+      "facet": "security",
+      "run_date": "2025-11-01T08:00:00Z",
+      "grade": "C",
+      "raw_data": {
+        "cve_counts": {
+          "Critical": 0,
+          "High": 4,
+          "Medium": 8,
+          "Low": 11,
+          "total": 23
+        },
+        "top_findings": [
+          {
+            "cve_id": "CVE-2024-37890",
+            "severity": "High",
+            "package": "ws",
+            "version": "8.16.0",
+            "source": "OSV"
+          },
+          {
+            "cve_id": "CVE-2024-43799",
+            "severity": "High",
+            "package": "send",
+            "version": "0.18.0",
+            "source": "NVD"
+          },
+          {
+            "cve_id": "CVE-2024-43800",
+            "severity": "High",
+            "package": "serve-static",
+            "version": "1.15.0",
+            "source": "NVD"
+          },
+          {
+            "cve_id": "CVE-2024-47764",
+            "severity": "High",
+            "package": "cookie",
+            "version": "0.6.0",
+            "source": "OSV"
+          }
+        ],
+        "sbom_format": "CycloneDX 1.6",
+        "improvement_rationale": "Critical CVEs from Run 2 (CVE-2024-29415, CVE-2024-45296) patched during October via dependency upgrades; remaining High findings are scheduled for Q4 remediation."
+      },
+      "scan_metadata": {
+        "timestamp": "2025-11-01T08:01:58Z",
+        "sources": ["NVD", "OSV"]
+      }
+    },
+    {
+      "application_id": "acme-inc/acme-api",
+      "facet": "complexity",
+      "run_date": "2025-11-01T08:00:00Z",
+      "grade": "TBD",
+      "raw_data": {
+        "loc": 13050,
+        "file_count": 196,
+        "contributor_count": 9,
+        "placeholder_label": "Grade: TBD — definition pending"
+      }
+    },
+    {
+      "application_id": "internal-tools/log-aggregator",
+      "facet": "tech_stack",
+      "run_date": "2025-11-01T08:00:00Z",
+      "grade": "C",
+      "raw_data": {
+        "language_share": {
+          "Python": 65,
+          "Go": 21,
+          "YAML": 8,
+          "Dockerfile": 6
+        },
+        "cloud_providers": ["aws", "gcp"],
+        "frameworks": ["fastapi", "celery", "pytest"],
+        "total_files": 171
+      }
+    },
+    {
+      "application_id": "internal-tools/log-aggregator",
+      "facet": "maturity",
+      "run_date": "2025-11-01T08:00:00Z",
+      "grade": "C",
+      "raw_data": {
+        "runtime": {
+          "python": "3.11",
+          "endoflife_status": "supported",
+          "eol_date": "2027-10-31"
+        },
+        "dependencies_total": 99,
+        "dependencies_eol": 12,
+        "eol_percent": 12.1,
+        "improvement_rationale": "Org migrated from Python 3.8 (EOL) to Python 3.11 (supported through 2027-10-31) during October; remaining 12 EOL dependencies are scheduled for upgrade in the next sprint."
+      }
+    },
+    {
+      "application_id": "internal-tools/log-aggregator",
+      "facet": "security",
+      "run_date": "2025-11-01T08:00:00Z",
+      "grade": "B",
+      "raw_data": {
+        "cve_counts": {
+          "Critical": 0,
+          "High": 3,
+          "Medium": 4,
+          "Low": 8,
+          "total": 15
+        },
+        "top_findings": [
+          {
+            "cve_id": "CVE-2024-35195",
+            "severity": "High",
+            "package": "requests",
+            "version": "2.31.0",
+            "source": "NVD"
+          },
+          {
+            "cve_id": "CVE-2024-26130",
+            "severity": "High",
+            "package": "cryptography",
+            "version": "42.0.0",
+            "source": "OSV"
+          },
+          {
+            "cve_id": "CVE-2024-3651",
+            "severity": "High",
+            "package": "idna",
+            "version": "3.6",
+            "source": "NVD"
+          }
+        ],
+        "sbom_format": "CycloneDX 1.6",
+        "recovery_rationale": "Recovered from Run 2 InsufficientData state: SBOM generation succeeded for both Python and Go ecosystems after the cdxgen tool pinning resolved the prior timeout."
+      },
+      "scan_metadata": {
+        "timestamp": "2025-11-01T08:03:22Z",
+        "sources": ["NVD", "OSV"]
+      }
+    },
+    {
+      "application_id": "internal-tools/log-aggregator",
+      "facet": "complexity",
+      "run_date": "2025-11-01T08:00:00Z",
+      "grade": "TBD",
+      "raw_data": {
+        "loc": 8910,
+        "file_count": 148,
+        "contributor_count": 5,
+        "placeholder_label": "Grade: TBD — definition pending"
+      }
+    }
+  ]
+}

@@ -1,0 +1,203 @@
+# ---------------------------------------------------------------------------
+# Technology Estate Report — Network Egress Allow-List
+# Package: technology-estate-report v0.1.0
+# Operationalizes: Rule R6 (SaaS data sourcing) and Rule R9 (CVE attribution)
+#
+# This file is the canonical, authoritative allow-list for outbound HTTP/HTTPS
+# requests made by the template at runtime. Any host NOT enumerated under
+# `allowed_hosts` is denied; SaaS vendor endpoints are explicitly denied per
+# Rule R6.
+#
+# Verification (Rule R6): template execution produces no outbound calls to SaaS vendor endpoints.
+#
+# Documented in: ../docs/configuration.md, ../docs/api-integrations.md
+# Canonical rule text: ../template.md § 5 Rules
+# ---------------------------------------------------------------------------
+---
+version: "0.1.0"
+
+description: >-
+  Canonical, authoritative network-egress allow-list for the Technology Estate
+  Report Blitzy prompt template package. The template MUST NOT make any
+  outbound HTTP/HTTPS request to any host not explicitly listed under
+  `allowed_hosts`; any unlisted host (and especially any live SaaS vendor
+  endpoint) is explicitly denied per Rule R6. This file is documented in
+  ../docs/configuration.md and referenced from ../docs/api-integrations.md
+  § Network Egress Allow-List; the canonical rule text lives in
+  ../template.md § 5 Rules.
+
+# ---------------------------------------------------------------------------
+# allowed_hosts — exhaustive, ordered enumeration of permitted upstream hosts
+#
+# Per AAP § 0.5.2, exactly five hosts are permitted in v0.1.0, listed in the
+# canonical order: GitHub, GitLab, endoflife.date, NVD, OSV. Each entry has
+# the per-host shape: id → host → purpose → consumed_by → auth → rate_limit
+# → documentation. Per AAP § 0.10.2 (No Redundancy Rule), the canonical
+# external-API contract details (base URL, auth, rate-limit semantics, retry
+# rules) live in ../docs/api-integrations.md; this file references that
+# document rather than duplicating the contract text.
+# ---------------------------------------------------------------------------
+allowed_hosts:
+
+  # -------------------------------------------------------------------------
+  # 1. GitHub API — repository ingestion (read-only)
+  # -------------------------------------------------------------------------
+  - id: github_api
+    host: api.github.com
+    purpose: "Source repository ingestion (artifact retrieval) for repositories whose application_id is hosted on GitHub. Read-only consumption per the ingestion contract in ../template.md § 3.1 Ingestion."
+    consumed_by:
+      - ingestion
+    auth:
+      required: true
+      env_var: GITHUB_TOKEN
+    rate_limit: "Authenticated rate limit applies; the template treats 429 responses as retryable per ../docs/api-integrations.md § GitHub API. Per Gate 2, any persistent rate-limit exhaustion surfaces as Insufficient Data per Rule R2 — never as a silent suppression."
+    documentation: ../docs/api-integrations.md#github-api
+
+  # -------------------------------------------------------------------------
+  # 2. GitLab API — repository ingestion (read-only)
+  # -------------------------------------------------------------------------
+  - id: gitlab_api
+    host: gitlab.com/api/v4
+    purpose: "Source repository ingestion (artifact retrieval) for repositories whose application_id is hosted on GitLab. Read-only consumption per the ingestion contract in ../template.md § 3.1 Ingestion."
+    consumed_by:
+      - ingestion
+    auth:
+      required: true
+      env_var: GITLAB_TOKEN
+    rate_limit: "Authenticated rate limit applies; the template treats 429 responses as retryable per ../docs/api-integrations.md § GitLab API. Per Gate 2, any persistent rate-limit exhaustion surfaces as Insufficient Data per Rule R2."
+    documentation: ../docs/api-integrations.md#gitlab-api
+
+  # -------------------------------------------------------------------------
+  # 3. endoflife.date API v1 — Maturity Summary EOL lookup
+  # -------------------------------------------------------------------------
+  - id: eol_api
+    host: endoflife.date
+    purpose: "Library and runtime end-of-life lookup for the Maturity Summary facet. Provides the per-product EOL status that drives the maturity grade. The API is currently in Beta; treat as stable but pin per-product slug resolution per ../docs/facets.md § Maturity Summary."
+    consumed_by:
+      - maturity
+    auth:
+      required: false
+    rate_limit: "Unauthenticated; treat as best-effort with retry-on-failure per ../docs/api-integrations.md § endoflife.date API v1. Per Gate 2 and Rule R2, any persistent lookup failure surfaces as Insufficient Data."
+    documentation: ../docs/api-integrations.md#endoflifedate-api-v1
+
+  # -------------------------------------------------------------------------
+  # 4. NVD CVE API v2.0 — Security Summary primary CVE source
+  # -------------------------------------------------------------------------
+  - id: nvd_cve_api
+    host: services.nvd.nist.gov
+    purpose: "CVE record retrieval for the Security Summary facet. Provides authoritative CVSS v3.1 base scores used by the CVSS-to-severity-tier mapping per Rule R4. The package uses the Vulnerability API v2.0 path /rest/json/cves/2.0/."
+    consumed_by:
+      - security
+    auth:
+      required: false
+      env_var: NVD_API_KEY
+    rate_limit: "Without an API key, 5 requests per 30-second window. With NVD_API_KEY supplied, 50 requests per 30-second window. The template treats HTTP 429 responses as retryable per ../docs/api-integrations.md § NVD CVE API v2.0. Per Rule R9, every CVE record returned is recorded with scan timestamp and source label NVD."
+    documentation: ../docs/api-integrations.md#nvd-cve-api-v20
+
+  # -------------------------------------------------------------------------
+  # 5. OSV API v1 — Security Summary alternate / cross-reference CVE source
+  # -------------------------------------------------------------------------
+  - id: osv_api
+    host: api.osv.dev
+    purpose: "CVE record retrieval (alternate / cross-reference source) for the Security Summary facet. The template prefers POST /v1/querybatch over per-package POST /v1/query because /v1/querybatch is approximately 3x faster per ../docs/api-integrations.md § OSV API v1."
+    consumed_by:
+      - security
+    auth:
+      required: false
+    rate_limit: "Currently no documented per-client rate limit. The API has a 32MiB response size limit when using HTTP/1.1 and no limit on HTTP/2; the template uses HTTP/2 transport per ../docs/api-integrations.md § OSV API v1. Per Rule R9, every CVE record returned is recorded with scan timestamp and source label OSV."
+    documentation: ../docs/api-integrations.md#osv-api-v1
+
+# ---------------------------------------------------------------------------
+# denied_categories — illustrative reminders of forbidden host categories
+#
+# Per Rule R6, Rule R6's prohibition is made explicit and machine-readable
+# below. The list is illustrative — the binding rule is the
+# `everything_else_default_deny` catch-all: any host not enumerated under
+# `allowed_hosts` is denied. The named categories serve as explicit
+# reminders for the most likely categories of accidental opt-in.
+# ---------------------------------------------------------------------------
+denied_categories:
+
+  # -------------------------------------------------------------------------
+  # 4.1 SaaS vendor endpoints (Rule R6) — explicitly denied
+  # -------------------------------------------------------------------------
+  - id: saas_vendor_endpoints
+    description: "Per Rule R6 (SaaS data sourcing), SaaS license data is sourced exclusively from repository manifests; live SaaS vendor API endpoints are denied here — see ../template.md § 5 Rules R6 for the canonical rule statement and verification procedure. The examples list below is illustrative and NOT exhaustive — ANY live SaaS vendor endpoint is denied unless and until it is explicitly added to allowed_hosts in a future package version."
+    examples:
+      - login.salesforce.com
+      - "*.my.salesforce.com"
+      - "*.servicenow.com"
+      - api.workday.com
+      - "*.zendesk.com"
+      - api.slack.com
+      - api.atlassian.com
+      - "*.okta.com"
+
+  # -------------------------------------------------------------------------
+  # 4.2 Cloud billing APIs — explicitly out of scope
+  # -------------------------------------------------------------------------
+  - id: cloud_billing_apis
+    description: "Live cloud billing APIs are explicitly out of scope per ../template.md § 4 Boundaries & Preservation. Cost data is not collected by this template package."
+    examples:
+      - ce.us-east-1.amazonaws.com
+      - consumption.azure.com
+      - cloudbilling.googleapis.com
+
+  # -------------------------------------------------------------------------
+  # 4.3 CMDB / ServiceNow integrations — explicitly out of scope
+  # -------------------------------------------------------------------------
+  - id: cmdb_servicenow
+    description: "CMDB / ServiceNow integrations are explicitly out of scope per ../template.md § 4 Boundaries & Preservation."
+    examples:
+      - "*.service-now.com"
+      - "cmdb.*"
+
+  # -------------------------------------------------------------------------
+  # 4.4 Runtime monitoring data sources — explicitly out of scope
+  # -------------------------------------------------------------------------
+  - id: runtime_monitoring
+    description: "Runtime monitoring data sources are explicitly out of scope per ../template.md § 4 Boundaries & Preservation. The template does not collect application performance, logging, or telemetry data."
+    examples:
+      - api.datadoghq.com
+      - api.newrelic.com
+      - "*.signalfx.com"
+      - api.honeycomb.io
+
+  # -------------------------------------------------------------------------
+  # 4.5 Catch-all default-deny — the binding rule
+  # -------------------------------------------------------------------------
+  - id: everything_else_default_deny
+    description: "Default-deny posture: any host not enumerated in allowed_hosts is denied. The previous categories are explicit reminders for the most likely categories of accidental opt-in. The runtime enforcement layer (described under enforcement below) MUST treat the allow-list as authoritative and reject any unlisted host."
+    examples: []
+
+# ---------------------------------------------------------------------------
+# enforcement — how the allow-list is operationalized at runtime
+#
+# Per Rule R6, the enforcement posture is default-deny: any outbound request
+# to a host not enumerated under `allowed_hosts` is refused. Per Rule R2 and
+# Gate 2, a refused request surfaces as an explicit Insufficient Data cell
+# value rather than a silent omission, and an audit log entry is recorded
+# for post-run review per Gate 2.
+# ---------------------------------------------------------------------------
+enforcement:
+  mode: default_deny
+  match_strategy: hostname_or_prefix
+  on_violation: surface_insufficient_data
+  audit_log_required: true
+  description: |-
+    Per Rule R6 verification: "template execution produces no outbound calls to SaaS vendor endpoints." The enforcement layer MUST refuse to issue any outbound HTTP/HTTPS request whose target hostname is not present in allowed_hosts. Per Gate 2 (zero-warning build), a refused request MUST surface as an explicit Insufficient Data cell value per Rule R2 and an audit log entry — never as a silent omission or suppressed error.
+
+# ---------------------------------------------------------------------------
+# references — package-internal documentation that consumes or describes
+# this file. All paths are relative to the location of this file in
+# `templates/technology-estate-report/config/`. No path reaches outside the
+# package root per AAP § 0.10.2 (Standalone Package Rule). Per AAP § 0.10.2
+# (No Redundancy Rule), this file does NOT duplicate the canonical Rule R6
+# text — it references the canonical location at ../template.md § 5 Rules.
+# ---------------------------------------------------------------------------
+references:
+  documentation: ../docs/configuration.md
+  api_integrations: ../docs/api-integrations.md
+  troubleshooting: ../docs/troubleshooting.md
+  template_entry_point: ../template.md
+  rule_r6_canonical_text: ../template.md#5-rules

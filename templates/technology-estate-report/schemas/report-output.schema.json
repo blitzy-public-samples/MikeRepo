@@ -1,0 +1,658 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:blitzy:technology-estate-report:report-output:v0.1.0",
+  "title": "Technology Estate Report — Output Data Contract",
+  "description": "JSON Schema (Draft 2020-12) contract for the intermediate report data structure produced by the grading engine and the grade-history persistence layer of the Technology Estate Report Blitzy prompt template package, and consumed by the PDF renderer to produce the final CIO/CTO-facing PDF artifact. This schema is the formal, machine-validatable shape of the data object that flows from analysis to rendering; it does NOT validate the rendered PDF binary itself (PDFs are not JSON). Per Rule R8 (PDF section order), the rendered PDF MUST contain exactly two sections in fixed order: an Executive Summary on page 1 followed by an Application Matrix Table on subsequent pages — the matrix table MUST NOT be the first content element. To operationalize Rule R8 structurally, this schema marks both `executive_summary` and `matrix` as REQUIRED top-level properties; the page-order semantics are enforced by the PDF renderer per ../docs/pdf-output.md § Section Order. Per Rule R7 (application identity stability), every matrix row and every CVE finding carries an `application_id` constrained to the canonical org/repo regex; the same repository MUST resolve to the same application_id across all runs. Per Rule R3 (grade history fidelity), every cell carries `current_grade`, `prior_grade`, and `prior_run_date` properties to support the inline rendering format `B  ←  prev: C  |  2025-10-01` documented in ../docs/pdf-output.md § Cell Rendering Format; the prior_grade slot accepts the special value `N/A` (per Rule R3) when no prior run exists for the (application, facet) pair, including the heterogeneous-scope first-run case for net-new repositories per Rule R10 (new repo compatibility). Per Rule R2 (facet completeness), every matrix row REQUIRES all four facet cells (Tech Stack | Maturity | Security | Complexity), and the cell grade enum includes the special value `InsufficientData` rendered as the literal cell value `Insufficient Data` in the PDF when source data is unavailable per ../docs/troubleshooting.md § Failure-Mode-to-Cell-Value Mapping. Per Rule R5 (Complexity placeholder integrity), the Complexity cell carries a `const` placeholder label `Grade: TBD — definition pending` (preserved verbatim with the em-dash U+2014 character) alongside the raw proxy metrics (LOC, file count, contributor count); the Complexity column MUST NOT be removed, collapsed, or backfilled with an inferred grade until an explicit Complexity rubric is supplied. Per Rule R4 (CVE severity breakdown), the Security cell REQUIRES a `severity_counts` object with the four canonical tiers (critical, high, medium, low) plus a total count — a single aggregate number without severity tiers is a failing state. Per Rule R9 (CVE attribution), the Security cell REQUIRES a `scan_metadata` object with `timestamp` (ISO 8601) and `sources` (NVD, OSV, or both); undated or unattributed CVE counts are a failing state. Operational documentation lives at ../docs/pdf-output.md (cell rendering, section order, page layout), ../docs/executive-summary.md (portfolio-level aggregation rules), and ../docs/architecture.md (component reachability matrix); the worked example mockup at ../examples/sample-pdf-mockup.md MUST validate against this schema once authored.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "report_metadata",
+    "executive_summary",
+    "matrix"
+  ],
+  "properties": {
+    "report_metadata": {
+      "$ref": "#/$defs/reportMetadata"
+    },
+    "executive_summary": {
+      "$ref": "#/$defs/executiveSummary"
+    },
+    "matrix": {
+      "type": "array",
+      "title": "Application Matrix",
+      "description": "The Application Matrix Table content per Rule R8, rendered on PDF page 2 and any subsequent pages — never on page 1, which is reserved for the Executive Summary. Per Rule R7 (application identity stability), each item is one row keyed by the canonical org/repo application_id. Per Rule R2 (facet completeness), each row carries all four facet cells (Tech Stack | Maturity | Security | Complexity) in the canonical column order documented in ../docs/pdf-output.md § Matrix Table Columns; no row may omit a facet. The array is permitted to be empty (minItems: 0) — an empty run scope is a legal degenerate case that produces a PDF with the Executive Summary content set to zero counts and an empty matrix table; this preserves Gate 2 (zero-warning build) by allowing the template to complete cleanly even when the run scope is empty.",
+      "minItems": 0,
+      "items": {
+        "$ref": "#/$defs/matrixRow"
+      }
+    }
+  },
+  "$defs": {
+    "applicationId": {
+      "type": "string",
+      "title": "Application Identifier",
+      "description": "Per Rule R7 (application identity stability): the repository full name in canonical org/repo form. The leading org segment is the repository owner (GitHub organization, GitHub user, or GitLab group/namespace) and the trailing repo segment is the repository name; the two are joined by a single forward slash. Each segment must begin with an alphanumeric character and may contain only alphanumeric characters, dots, underscores, or hyphens — this matches the union of GitHub.com and GitLab.com permitted characters for owners and repository names. The same repository MUST resolve to the same application_id across all runs; changing the key format between runs is prohibited per Rule R7. This definition mirrors the application_id field in ../schemas/grade-history.schema.json so that a record produced by the grade-history persistence layer round-trips cleanly into a matrix row of this schema.",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]*\\/[a-zA-Z0-9][a-zA-Z0-9._-]*$",
+      "minLength": 3,
+      "maxLength": 200,
+      "examples": [
+        "acme-inc/acme-api",
+        "internal-tools/log-aggregator"
+      ]
+    },
+    "facetIdentifier": {
+      "type": "string",
+      "title": "Facet Identifier",
+      "description": "One of the four canonical facet identifiers per the user prompt § 3.2 Facet Analysis. The four-facet matrix column order is fixed and immutable per Rule R2 (facet completeness): Tech Stack | Maturity | Security | Complexity. The enum order below mirrors this canonical column order and matches ../schemas/grade-history.schema.json#/properties/facet/enum.",
+      "enum": [
+        "tech_stack",
+        "maturity",
+        "security",
+        "complexity"
+      ]
+    },
+    "cellGrade": {
+      "type": "string",
+      "title": "Cell Grade Value (Current)",
+      "description": "Permitted current-grade values for a matrix cell. The enum admits seven values across three categories: (1) the canonical letter grades A, B, C, D, F emitted by the grading engine when the user-supplied rubric (per Rule R1) matches the per-facet raw data; (2) the special non-letter value TBD reserved for the Complexity facet placeholder per Rule R5 — the Complexity column is locked to \"Grade: TBD — definition pending\" until an explicit Complexity rubric is supplied, and the column MUST NOT be removed, collapsed, or backfilled with an inferred grade until that rubric arrives; (3) the special non-letter value InsufficientData used by the persistence and PDF rendering layers — InsufficientData represents a current-run cell whose source data was unavailable per Rule R2 (rendered as the literal string \"Insufficient Data\" in the PDF; the schema uses the camel-cased identifier InsufficientData to remain a single-token enum value while Rule R2 mandates the human-readable two-word string at render time, with the mapping documented in ../docs/troubleshooting.md and ../docs/pdf-output.md § Cell Rendering Format). Note that N/A is NOT a valid current-grade value here; N/A is only valid as a prior-grade per Rule R3 — see #/$defs/priorCellGrade.",
+      "enum": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "F",
+        "TBD",
+        "InsufficientData"
+      ]
+    },
+    "priorCellGrade": {
+      "type": "string",
+      "title": "Cell Grade Value (Prior)",
+      "description": "Permitted prior-grade values for a matrix cell. The enum extends #/$defs/cellGrade with one additional value: N/A. Per Rule R3 (grade history fidelity), N/A is rendered when no prior run exists for the (application, facet) pair — this is the canonical first-run state for any repository. Per Rule R10 (new repo compatibility), N/A is also the prior-grade slot value for net-new repositories joining a recurring run alongside previously-ingested repositories; the heterogeneous-scope flow is documented in ../docs/grade-history.md § Heterogeneous Scope. The other admitted values (A, B, C, D, F, TBD, InsufficientData) carry the same semantics as in #/$defs/cellGrade — a prior run for this (application, facet) may itself have been any of these states, including a prior `InsufficientData` outcome (a previously-failed data source) or a prior `TBD` outcome (the Complexity placeholder before a rubric is supplied).",
+      "enum": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "F",
+        "TBD",
+        "InsufficientData",
+        "N/A"
+      ]
+    },
+    "severityTier": {
+      "type": "string",
+      "title": "CVE Severity Tier",
+      "description": "Per Rule R4 (CVE severity breakdown), the four canonical CVE severity tiers reported in the Security Summary cell. The mapping from CVSS v3.1 base scores to these tiers is documented in ../docs/facets.md § Security Summary § CVSS-to-Severity Mapping (the canonical mapping uses the FIRST CVSS v3.1 ranges: Critical 9.0–10.0, High 7.0–8.9, Medium 4.0–6.9, Low 0.1–3.9). The enum is case-sensitive: each label is capitalized first letter only — Rule R4 verification (\"Security Summary cell contains four severity labels + total for every application\") checks for these exact labels.",
+      "enum": [
+        "Critical",
+        "High",
+        "Medium",
+        "Low"
+      ]
+    },
+    "priorRunDate": {
+      "title": "Prior Run Date",
+      "description": "The ISO 8601 datetime of the prior run record for this (application, facet) pair, or null when no prior run exists. Per Rule R3 (grade history fidelity), this value populates the trailing date segment of the inline cell-rendering format `B  ←  prev: C  |  2025-10-01`; per Rule R3 the cell renders `N/A` (with prior_grade=`N/A` and prior_run_date=null) when no prior run record exists for the (application, facet) pair, including for net-new repositories per Rule R10 (new repo compatibility). The two branches of this oneOf MUST be used in the canonical pairing: when prior_grade is `N/A`, prior_run_date MUST be null; when prior_grade is any other value (A, B, C, D, F, TBD, InsufficientData), prior_run_date MUST be a valid ISO 8601 date-time string. The schema does not enforce that pairing structurally (the constraint applies across two sibling fields and is ergonomically expressed in prose); it is enforced by the grading engine and the grade-history persistence layer per ../docs/grade-history.md § Rendering.",
+      "oneOf": [
+        {
+          "type": "string",
+          "format": "date-time",
+          "title": "Prior Run Date (ISO 8601)",
+          "description": "The ISO 8601 datetime of the prior run record for this (application, facet) pair. The Draft 2020-12 format identifier \"date-time\" maps to RFC 3339 / ISO 8601 datetime values (e.g., \"2025-10-01T00:00:00Z\"). Per Rule R3, the date portion of this datetime is what populates the trailing date segment after the pipe in the cell-rendering format `B  ←  prev: C  |  2025-10-01`.",
+          "examples": [
+            "2025-10-01T00:00:00Z",
+            "2026-01-15T12:34:56Z"
+          ]
+        },
+        {
+          "type": "null",
+          "title": "Prior Run Date (Absent)",
+          "description": "Null when no prior run exists for this (application, facet) pair; corresponds to prior_grade=`N/A` per Rule R3. Used for first-run repositories and for net-new repositories joining a recurring run per Rule R10."
+        }
+      ]
+    },
+    "scanMetadata": {
+      "type": "object",
+      "title": "Scan Metadata",
+      "description": "Per Rule R9 (CVE attribution), every Security Summary result MUST include the scan timestamp (ISO 8601) and the source database label (NVD, OSV, or both). Undated or unattributed CVE counts are a failing state per Rule R9. This definition mirrors ../schemas/grade-history.schema.json#/$defs/scanMetadata and is inlined here (rather than cross-referenced via an external $ref) so this schema remains self-contained — a consumer needs only this single document to validate a complete report-output payload, with no resolution of cross-document references required. The two required fields capture the full attribution required by Rule R9 verification (\"each Security Summary cell or report footnote contains timestamp and database label\").",
+      "additionalProperties": false,
+      "required": [
+        "timestamp",
+        "sources"
+      ],
+      "properties": {
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "title": "Scan Timestamp",
+          "description": "The ISO 8601 datetime at which the underlying CVE scan was executed. The Draft 2020-12 format identifier \"date-time\" maps to RFC 3339 / ISO 8601 datetime values (e.g., \"2025-10-01T00:00:00Z\"). Per Rule R9, this field MUST NOT be omitted on any security-related result; an undated CVE count is an explicit failing state. The scan_metadata.timestamp is logically distinct from the parent report's run_date: the run_date is the moment the template was invoked, while scan_metadata.timestamp is the moment the CVE database lookup itself was performed (which may differ if the CVE pipeline caches NVD/OSV responses across multiple runs).",
+          "examples": [
+            "2025-10-01T00:00:00Z",
+            "2026-01-15T12:34:56Z"
+          ]
+        },
+        "sources": {
+          "type": "array",
+          "title": "Source Databases",
+          "description": "Per Rule R9 (CVE attribution), the canonical CVE source databases are NVD (the U.S. National Vulnerability Database, accessed via NVD CVE API v2.0 per ../docs/api-integrations.md § NVD CVE API v2.0) and OSV (the Open Source Vulnerabilities database, accessed via OSV API v1 per ../docs/api-integrations.md § OSV API v1). Valid array contents per Rule R9 are: [\"NVD\"] (NVD only); [\"OSV\"] (OSV only); or [\"NVD\", \"OSV\"] (both, the canonical \"NVD+OSV\" composite case used when the CVE pipeline cross-references both databases for a single scan). The array is constrained to minItems: 1 (at least one source MUST be cited per Rule R9 — an unattributed CVE count is a failing state) and uniqueItems: true (each source MUST be cited at most once per record; the array form is a set, not a multiset).",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "title": "Source Database Identifier",
+            "description": "One of the two canonical CVE source databases used by the Security facet's CVE pipeline per ../docs/api-integrations.md. The enum is uppercase (NVD, OSV) per the verbatim labels used in the user prompt Rule R9. The mixed-case forms (Nvd, nvd, Osv, osv) and the spelled-out forms (e.g., \"National Vulnerability Database\") are NOT accepted — Rule R9 verification checks for the exact uppercase label.",
+            "enum": [
+              "NVD",
+              "OSV"
+            ]
+          },
+          "examples": [
+            ["NVD"],
+            ["OSV"],
+            ["NVD", "OSV"]
+          ]
+        }
+      }
+    },
+    "reportMetadata": {
+      "type": "object",
+      "title": "Report Metadata",
+      "description": "Top-level metadata about this report run. Carries the `run_date` (the moment the template was invoked, used as the discriminator against prior runs in the grade-history persistence layer per ../schemas/grade-history.schema.json) and the `template_version` (the semantic version of the Technology Estate Report template package, matched against ../CHANGELOG.md). The optional `rubric_id` field carries an opaque identifier of the user-supplied rubric document used for this run (a SHA-256 digest, a human-authored label, or any other reference); it supports Rule R1 (rubric editability) verification by allowing two runs over the same dataset with two different rubrics to be distinguished by rubric_id alone — generating a report with two different rubric inputs for the same dataset produces two different grade outputs, and rubric_id is the trail by which the two runs are correlated.",
+      "additionalProperties": false,
+      "required": [
+        "run_date",
+        "template_version"
+      ],
+      "properties": {
+        "run_date": {
+          "type": "string",
+          "format": "date-time",
+          "title": "Run Date",
+          "description": "The ISO 8601 datetime at which this run was executed. The Draft 2020-12 format identifier \"date-time\" maps to RFC 3339 / ISO 8601 datetime values (e.g., \"2025-10-01T00:00:00Z\"). Rules R3 and R9 mandate ISO 8601 throughout the template package; this field carries that contract at the report-output level. The run_date here is the same value persisted to ../schemas/grade-history.schema.json#/properties/run_date for every record produced by this run; that consistency enables Rule R7 verification (continuous grade history across three sequential runs with no duplicate or orphaned entries).",
+          "examples": [
+            "2025-10-01T00:00:00Z",
+            "2026-01-15T12:34:56Z"
+          ]
+        },
+        "template_version": {
+          "type": "string",
+          "title": "Template Version",
+          "description": "The semantic version of the Technology Estate Report template package used to produce this report, in canonical semver form (e.g., \"0.1.0\", \"1.0.0\", \"1.2.3-rc.1\"). This MUST match the latest version recorded in ../CHANGELOG.md. The pattern accepts the canonical MAJOR.MINOR.PATCH form with an optional pre-release suffix (e.g., \"-rc.1\", \"-beta\", \"-alpha.2\"); build metadata suffixes (e.g., \"+build.123\") are deliberately excluded to keep version comparison deterministic.",
+          "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[A-Za-z0-9.-]+)?$",
+          "examples": [
+            "0.1.0",
+            "1.0.0",
+            "1.2.3-rc.1"
+          ]
+        },
+        "rubric_id": {
+          "type": "string",
+          "title": "Rubric Identifier",
+          "description": "Optional identifier of the user-supplied rubric document used for this run. The format is opaque to this schema: it MAY be a SHA-256 digest of the rubric YAML file (deterministic across re-runs of the same rubric content), a human-authored label (e.g., \"q4-2025-rubric\"), or any other reference convention. The rubric_id supports Rule R1 (rubric editability) verification (\"generating a report with two different rubric inputs for the same dataset produces two different grade outputs\") by allowing two runs to be correlated to their respective rubrics post hoc.",
+          "minLength": 1
+        }
+      }
+    },
+    "executiveSummary": {
+      "type": "object",
+      "title": "Executive Summary",
+      "description": "Page 1 content of the rendered PDF per Rule R8 (PDF section order) — see ../template.md § 5 Rules R8 for the canonical rule statement and ../docs/pdf-output.md § Section Order for the page-layout contract. The five required properties below correspond to the user-supplied Executive Summary content list per the user prompt § 3 Technical Specifications: total applications in scope; A–F grade distribution per facet; top Critical/High CVE findings; highest-maturity-risk applications; and net grade improvement/regression trends versus the prior run. Per Rule R10 (new repo compatibility), portfolio-level aggregations correctly handle a heterogeneous mix of previously-ingested and net-new repositories: net-new repositories contribute to total_applications and grade_distribution but are tallied separately in trend_versus_prior_run.no_prior_run rather than counted as improvements or regressions. The portfolio-level aggregation rules — including how grade distribution counts are computed, how \"top\" CVE findings are ranked and limited, how \"highest-maturity-risk\" applications are scored and ranked, and how trend-versus-prior-run is computed at the portfolio level — are documented in ../docs/executive-summary.md.",
+      "additionalProperties": false,
+      "required": [
+        "total_applications",
+        "grade_distribution",
+        "top_critical_high_cve_findings",
+        "highest_maturity_risk_applications",
+        "trend_versus_prior_run"
+      ],
+      "properties": {
+        "total_applications": {
+          "type": "integer",
+          "minimum": 0,
+          "title": "Total Applications In Scope",
+          "description": "The total count of repositories (applications) in this run scope, equal to the length of the top-level `matrix` array. Per Rule R7 (application identity stability), each repository contributes exactly one count regardless of whether it is a previously-ingested repository or a net-new repository per Rule R10. An empty run scope produces total_applications = 0; this is a legal degenerate case that completes cleanly per Gate 2 (zero-warning build)."
+        },
+        "grade_distribution": {
+          "$ref": "#/$defs/gradeDistributionByFacet"
+        },
+        "top_critical_high_cve_findings": {
+          "type": "array",
+          "title": "Top Critical / High CVE Findings",
+          "description": "An ordered array of the top Critical and High severity CVE findings ranked across the portfolio for inclusion in the Executive Summary's Top CVE list. Per Rule R4 (CVE severity breakdown), only Critical and High severity tiers are eligible for this list — Medium and Low findings are reflected in the per-application Security cell severity_counts but are NOT promoted to the portfolio-level Top CVE list. The ranking and limit rules are documented in ../docs/executive-summary.md § Top CVE Findings; the canonical ranking is by descending CVSS v3.1 base score, ties broken by ascending application_id (lexicographic) then ascending cve_id (lexicographic) for determinism. Per Rule R9 (CVE attribution), every finding carries scan timestamp and source database label.",
+          "items": {
+            "$ref": "#/$defs/cveFinding"
+          }
+        },
+        "highest_maturity_risk_applications": {
+          "type": "array",
+          "title": "Highest Maturity Risk Applications",
+          "description": "An ordered array of applications ranked by maturity risk for inclusion in the Executive Summary's Highest Maturity Risk list. Risk is scored by the percentage of out-of-support dependencies (per the endoflife.date API v1 lookup documented in ../docs/api-integrations.md § endoflife.date API v1); the canonical ranking is by descending risk_score, ties broken by ascending application_id (lexicographic) for determinism. The full ranking formula and limit rule are documented in ../docs/executive-summary.md § Highest Maturity Risk Applications.",
+          "items": {
+            "$ref": "#/$defs/maturityRiskApplication"
+          }
+        },
+        "trend_versus_prior_run": {
+          "$ref": "#/$defs/trendVersusPriorRun"
+        }
+      }
+    },
+    "gradeDistributionByFacet": {
+      "type": "object",
+      "title": "Grade Distribution By Facet",
+      "description": "A–F grade distribution per facet (Executive Summary content list, user prompt § 3 Technical Specifications). All four facet keys (tech_stack, maturity, security, complexity) are required for determinism — Rule R2 (facet completeness) mandates all four facets be present in every report run, and the executive summary distribution mirrors that. The four keys are presented in the canonical column order (Tech Stack | Maturity | Security | Complexity) matching ../docs/pdf-output.md § Matrix Table Columns. Per Rule R5 (Complexity placeholder integrity), the Complexity facet histogram will typically have all-zero letter-grade counts and a non-zero TBD count until a Complexity rubric is supplied; this remains a legal histogram and renders deterministically per ../docs/executive-summary.md.",
+      "additionalProperties": false,
+      "required": [
+        "tech_stack",
+        "maturity",
+        "security",
+        "complexity"
+      ],
+      "properties": {
+        "tech_stack": {
+          "$ref": "#/$defs/gradeHistogram"
+        },
+        "maturity": {
+          "$ref": "#/$defs/gradeHistogram"
+        },
+        "security": {
+          "$ref": "#/$defs/gradeHistogram"
+        },
+        "complexity": {
+          "$ref": "#/$defs/gradeHistogram"
+        }
+      }
+    },
+    "gradeHistogram": {
+      "type": "object",
+      "title": "Grade Histogram",
+      "description": "Count of applications by grade for a single facet. All seven count buckets (A, B, C, D, F, TBD, InsufficientData) are required for determinism — every report run produces a fully-populated histogram even when some buckets are zero, which keeps downstream PDF rendering deterministic and supports Gate 2 (zero-warning build). The sum of all seven counts equals total_applications when a facet has no Insufficient Data conditions; in the heterogeneous case the sum still equals total_applications because every application contributes exactly one count to exactly one bucket per facet (Rule R2 mandates every facet cell be populated, even with InsufficientData). Per Rule R5 (Complexity placeholder integrity), the Complexity facet histogram will typically be {A:0, B:0, C:0, D:0, F:0, TBD: total_applications, InsufficientData: 0} until a Complexity rubric is supplied. The N/A grade is NOT a valid histogram bucket here because N/A is exclusively a prior-grade value per Rule R3 and never a current-grade value.",
+      "additionalProperties": false,
+      "required": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "F",
+        "TBD",
+        "InsufficientData"
+      ],
+      "properties": {
+        "A": {
+          "type": "integer",
+          "minimum": 0,
+          "title": "Count of Grade A",
+          "description": "Count of applications graded A for this facet."
+        },
+        "B": {
+          "type": "integer",
+          "minimum": 0,
+          "title": "Count of Grade B",
+          "description": "Count of applications graded B for this facet."
+        },
+        "C": {
+          "type": "integer",
+          "minimum": 0,
+          "title": "Count of Grade C",
+          "description": "Count of applications graded C for this facet."
+        },
+        "D": {
+          "type": "integer",
+          "minimum": 0,
+          "title": "Count of Grade D",
+          "description": "Count of applications graded D for this facet."
+        },
+        "F": {
+          "type": "integer",
+          "minimum": 0,
+          "title": "Count of Grade F",
+          "description": "Count of applications graded F for this facet."
+        },
+        "TBD": {
+          "type": "integer",
+          "minimum": 0,
+          "title": "Count of Grade TBD (Rule R5)",
+          "description": "Count of applications whose grade for this facet is TBD per Rule R5 (Complexity placeholder integrity). The Complexity column is locked to \"Grade: TBD — definition pending\" until an explicit Complexity rubric is supplied; while locked, every application contributes one count to this bucket. For non-Complexity facets this count is typically 0; a non-zero TBD count on a non-Complexity facet is permitted by the schema but is unusual and SHOULD be investigated per ../docs/troubleshooting.md."
+        },
+        "InsufficientData": {
+          "type": "integer",
+          "minimum": 0,
+          "title": "Count of Grade InsufficientData (Rule R2)",
+          "description": "Count of applications whose grade for this facet is InsufficientData per Rule R2 (facet completeness). Rule R2 mandates that every facet cell be present in every matrix row — when source data is unavailable for a facet, the cell renders the literal string \"Insufficient Data\" rather than being omitted. The schema uses the camel-cased identifier `InsufficientData` (single token) while the rendered cell uses the human-readable two-word string \"Insufficient Data\"; the mapping is documented in ../docs/troubleshooting.md and ../docs/pdf-output.md § Cell Rendering Format."
+        }
+      }
+    },
+    "cveFinding": {
+      "type": "object",
+      "title": "Top CVE Finding (Critical or High)",
+      "description": "A single Critical or High severity CVE finding ranked across the portfolio for inclusion in the Executive Summary's Top Critical/High CVE Findings list. Per Rule R4 (CVE severity breakdown), only Critical and High severity tiers are eligible for this list — Medium and Low findings are reflected in the per-application Security cell severity_counts but are NOT promoted to this portfolio-level list. Per Rule R9 (CVE attribution), every finding carries scan timestamp and source database label via the embedded scan_metadata object. Per Rule R7 (application identity stability), the finding is attributed to its application via the canonical org/repo application_id. The optional package, version, and cvss_score fields are recommended for CIO/CTO-facing readability but are not strictly required by Rule R4; their presence is enforced as an editorial best practice in ../docs/executive-summary.md § Top CVE Findings.",
+      "additionalProperties": false,
+      "required": [
+        "application_id",
+        "cve_id",
+        "severity",
+        "scan_metadata"
+      ],
+      "properties": {
+        "application_id": {
+          "$ref": "#/$defs/applicationId"
+        },
+        "cve_id": {
+          "type": "string",
+          "title": "CVE Identifier",
+          "description": "The canonical CVE identifier in the form CVE-YYYY-NNNNN, where YYYY is the four-digit year of CVE assignment and NNNNN is the numeric sequence assigned by the CVE Numbering Authority (CNA). Per the CVE specification, the sequence portion is a minimum of four digits (right-padded with zeros from the original CVE format) and may be longer for higher-numbered IDs (e.g., CVE-2024-12345 is canonical, CVE-2024-1234567 is permitted by the CVE specification and accepted by this schema). The pattern accepts four or more digits in the sequence segment.",
+          "pattern": "^CVE-\\d{4}-\\d{4,}$",
+          "examples": [
+            "CVE-2024-12345",
+            "CVE-2023-98765"
+          ]
+        },
+        "severity": {
+          "type": "string",
+          "title": "Severity Tier",
+          "description": "The severity tier of this CVE finding. Per Rule R4 (CVE severity breakdown), only Critical and High are eligible for the Top CVE Findings list — Medium and Low CVEs are tallied in the per-application Security cell severity_counts but are NOT promoted to this portfolio-level list. The severity tier is derived from the CVSS v3.1 base score per the canonical mapping documented in ../docs/facets.md § Security Summary § CVSS-to-Severity Mapping.",
+          "enum": [
+            "Critical",
+            "High"
+          ]
+        },
+        "package": {
+          "type": "string",
+          "title": "Affected Package",
+          "description": "Optional name of the package or component affected by this CVE (e.g., \"log4j-core\", \"openssl\", \"requests\"). Sourced from the CycloneDX SBOM that drove the CVE lookup per ../docs/facets.md § Security Summary. The package name is in the package-manager-native form (e.g., the npm package name, the PyPI package name, the Maven coordinate); cross-ecosystem normalization is NOT applied at this level.",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "title": "Affected Version",
+          "description": "Optional version string of the affected package, in the package-manager-native version form (e.g., \"2.14.0\", \"1.0.0-rc.1\"). Sourced from the CycloneDX SBOM that drove the CVE lookup. The version is the version present in the repository's lockfile / manifest at scan time; it is NOT the version range of the CVE advisory itself.",
+          "minLength": 1
+        },
+        "cvss_score": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 10.0,
+          "title": "CVSS Base Score",
+          "description": "Optional CVSS v3.1 base score in the canonical [0.0, 10.0] range. Per the canonical CVSS-to-severity-tier mapping in ../docs/facets.md § Security Summary § CVSS-to-Severity Mapping, scores in [9.0, 10.0] map to Critical, [7.0, 8.9] to High, [4.0, 6.9] to Medium, and [0.1, 3.9] to Low. The cvss_score field is the underlying scalar that determines the severity tier; it is the canonical sort key for portfolio-level Top CVE Findings ranking per ../docs/executive-summary.md § Top CVE Findings."
+        },
+        "scan_metadata": {
+          "$ref": "#/$defs/scanMetadata"
+        }
+      }
+    },
+    "maturityRiskApplication": {
+      "type": "object",
+      "title": "Highest Maturity Risk Application",
+      "description": "An application ranked by maturity risk for inclusion in the Executive Summary's Highest Maturity Risk list. Risk is scored by the percentage of out-of-support dependencies relative to the total tracked dependencies, per ../docs/facets.md § Maturity Summary; the percentage is sourced from endoflife.date API v1 lookups (per ../docs/api-integrations.md § endoflife.date API v1). Per Rule R7 (application identity stability), the application is identified by the canonical org/repo application_id. The optional out_of_support_count and total_tracked_count fields are the raw inputs to the risk_score and are recommended for CIO/CTO-facing readability; their presence is enforced as an editorial best practice in ../docs/executive-summary.md § Highest Maturity Risk Applications.",
+      "additionalProperties": false,
+      "required": [
+        "application_id",
+        "risk_score"
+      ],
+      "properties": {
+        "application_id": {
+          "$ref": "#/$defs/applicationId"
+        },
+        "risk_score": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "title": "Maturity Risk Score",
+          "description": "Maturity risk score in the [0.0, 1.0] range, computed as the ratio out_of_support_count / total_tracked_count when total_tracked_count > 0, or 0.0 by convention when total_tracked_count == 0 (no dependencies tracked by endoflife.date). A score of 1.0 indicates 100% of tracked dependencies are past EOL; a score of 0.0 indicates zero EOL dependencies (or no tracked dependencies at all). The score is the canonical sort key for portfolio-level Highest Maturity Risk ranking per ../docs/executive-summary.md § Highest Maturity Risk Applications."
+        },
+        "out_of_support_count": {
+          "type": "integer",
+          "minimum": 0,
+          "title": "Out-of-Support Dependency Count",
+          "description": "Optional count of this application's dependencies whose detected version is past its EOL date per the endoflife.date API v1 lookup (../docs/api-integrations.md § endoflife.date API v1). The numerator of the risk_score ratio."
+        },
+        "total_tracked_count": {
+          "type": "integer",
+          "minimum": 0,
+          "title": "Total Tracked Dependency Count",
+          "description": "Optional count of this application's dependencies that are tracked by endoflife.date (i.e., have a recognized product slug in the endoflife.date catalog). The denominator of the risk_score ratio. Dependencies that are NOT tracked by endoflife.date are excluded from both numerator and denominator and are reflected as \"Insufficient Data\" cell content per ../docs/troubleshooting.md when the entire dependency set is untracked."
+        }
+      }
+    },
+    "trendVersusPriorRun": {
+      "type": "object",
+      "title": "Trend Versus Prior Run",
+      "description": "Per the user prompt § 3 Technical Specifications Executive Summary content list: net grade improvement / regression trends versus the prior run. Counts (application, facet) pairs whose grade has changed since the most-recent prior run for the same (application, facet) pair as resolved from ../schemas/grade-history.schema.json. Per Rule R10 (new repo compatibility), pairs with no prior run record (first-run repositories per Rule R3, including net-new repositories joining a recurring run) are tallied separately in `no_prior_run` rather than being silently dropped or counted as improvements/regressions; this preserves Rule R3 (grade history fidelity) at the portfolio level. The four required count buckets (net_improvements, net_regressions, unchanged, no_prior_run) are mutually exclusive and collectively exhaustive: every (application, facet) pair in the run scope contributes exactly one count to exactly one bucket. The sum of all four counts equals total_applications × 4 (four facets per application). The improvement / regression direction is documented in ../docs/executive-summary.md § Trend Versus Prior Run; the canonical convention is that A is the best grade and F is the worst, with TBD and InsufficientData counted as `unchanged` when both prior and current are TBD/InsufficientData and as `no_prior_run` when prior is N/A.",
+      "additionalProperties": false,
+      "required": [
+        "net_improvements",
+        "net_regressions",
+        "unchanged",
+        "no_prior_run"
+      ],
+      "properties": {
+        "net_improvements": {
+          "type": "integer",
+          "minimum": 0,
+          "title": "Net Improvements",
+          "description": "Count of (application, facet) pairs whose current grade is strictly better than the prior grade (e.g., prior C → current B, prior F → current D). Pairs with no prior run record are NOT counted here — they are tallied in `no_prior_run` instead. The improvement direction follows the canonical convention A > B > C > D > F documented in ../docs/executive-summary.md § Trend Versus Prior Run."
+        },
+        "net_regressions": {
+          "type": "integer",
+          "minimum": 0,
+          "title": "Net Regressions",
+          "description": "Count of (application, facet) pairs whose current grade is strictly worse than the prior grade (e.g., prior B → current C, prior A → current F). Pairs with no prior run record are NOT counted here — they are tallied in `no_prior_run` instead."
+        },
+        "unchanged": {
+          "type": "integer",
+          "minimum": 0,
+          "title": "Unchanged",
+          "description": "Count of (application, facet) pairs whose current grade equals the prior grade (e.g., prior B → current B, prior TBD → current TBD, prior InsufficientData → current InsufficientData). This bucket includes pairs where the Complexity facet remains locked to TBD across runs per Rule R5, and pairs where a previously-failed data source remains unavailable across runs."
+        },
+        "no_prior_run": {
+          "type": "integer",
+          "minimum": 0,
+          "title": "No Prior Run (Rule R10)",
+          "description": "Count of (application, facet) pairs with no prior run record — i.e., the prior_grade slot for the pair renders `N/A` per Rule R3. Per Rule R10 (new repo compatibility), this includes the first-run case for net-new repositories joining a recurring run and the first-ever run of a new application. These pairs are NOT silently dropped or counted as improvements / regressions; they are tallied here separately so that the executive summary can correctly reflect the heterogeneous-scope state."
+        }
+      }
+    },
+    "matrixRow": {
+      "type": "object",
+      "title": "Application Matrix Row",
+      "description": "One row of the Application Matrix Table per the user prompt § 3 Technical Specifications. Per Rule R7 (application identity stability), the row is keyed by the canonical org/repo application_id; the same repository MUST resolve to the same application_id across all runs. Per Rule R2 (facet completeness), all four facet cells (tech_stack, maturity, security, complexity) MUST be present in every matrix row — omitting a cell is prohibited; when source data is unavailable for a facet, the cell renders \"Insufficient Data\" via current_grade=`InsufficientData` rather than being absent. The four facet keys are presented in the canonical column order Tech Stack | Maturity | Security | Complexity per ../docs/pdf-output.md § Matrix Table Columns. The org property carries the organization (left-hand side of org/repo) as a secondary grouping label per the user prompt § 2 Task Context.",
+      "additionalProperties": false,
+      "required": [
+        "application_id",
+        "org",
+        "tech_stack",
+        "maturity",
+        "security",
+        "complexity"
+      ],
+      "properties": {
+        "application_id": {
+          "$ref": "#/$defs/applicationId"
+        },
+        "org": {
+          "type": "string",
+          "title": "Organization (Secondary Grouping Label)",
+          "description": "The organization name (left-hand side of the canonical org/repo application_id). Used as the secondary grouping label per the user prompt § 2 Task Context. The org value MUST equal the substring of application_id before the first forward slash; this redundancy is deliberate to enable a PDF-renderer consumer to group rows by organization without re-parsing application_id. The org-as-grouping-label convention is rendered per ../docs/pdf-output.md § Matrix Table Layout.",
+          "minLength": 1,
+          "examples": [
+            "acme-inc",
+            "internal-tools"
+          ]
+        },
+        "tech_stack": {
+          "$ref": "#/$defs/genericCell"
+        },
+        "maturity": {
+          "$ref": "#/$defs/genericCell"
+        },
+        "security": {
+          "$ref": "#/$defs/securityCell"
+        },
+        "complexity": {
+          "$ref": "#/$defs/complexityCell"
+        }
+      }
+    },
+    "genericCell": {
+      "type": "object",
+      "title": "Generic Facet Cell (Tech Stack, Maturity)",
+      "description": "Cell rendering for the Tech Stack and Maturity facets — facets that do not require facet-specific structured data beyond the canonical (current_grade, prior_grade, prior_run_date) triple. Per Rule R3 (grade history fidelity), prior_grade and prior_run_date are present in every cell and rendered as `N/A` (with prior_run_date=null) when no prior run exists for the (application, facet) pair, including for net-new repositories per Rule R10 (new repo compatibility). Per Rule R2 (facet completeness), the cell renders \"Insufficient Data\" when the underlying data source is unavailable; in that case current_grade is `InsufficientData` and raw_data MAY be empty (additionalProperties: true allows it to be omitted entirely or to carry partial diagnostic data). The optional raw_data object is the free-form facet-specific raw data captured at run time; per the AAP § 0.10.2 \"No Redundancy Rule\", the per-facet shape contracts live in ../docs/facets.md rather than being duplicated in this schema. The Security facet uses #/$defs/securityCell instead (carries severity_counts and scan_metadata per Rules R4 and R9); the Complexity facet uses #/$defs/complexityCell instead (carries placeholder_label and raw_metrics per Rule R5).",
+      "additionalProperties": false,
+      "required": [
+        "current_grade",
+        "prior_grade",
+        "prior_run_date"
+      ],
+      "properties": {
+        "current_grade": {
+          "$ref": "#/$defs/cellGrade"
+        },
+        "prior_grade": {
+          "$ref": "#/$defs/priorCellGrade"
+        },
+        "prior_run_date": {
+          "$ref": "#/$defs/priorRunDate"
+        },
+        "raw_data": {
+          "type": "object",
+          "title": "Raw Facet Data",
+          "description": "Optional free-form facet-specific raw data captured at run time. Per ../docs/facets.md, the suggested per-facet contents are: for Tech Stack — language % share by file count, detected cloud providers from IaC resource types, vendor/framework extraction from dependency manifests; for Maturity — detected runtime versions and their EOL status from the endoflife.date API v1 lookup plus the percentage of out-of-support dependencies. The schema accepts additional properties (additionalProperties: true) to allow forward-compatible per-facet expansion without requiring a schema migration; per the AAP § 0.10.2 \"No Redundancy Rule\", the per-facet shape contracts live in ../docs/facets.md rather than being duplicated here. When current_grade is `InsufficientData` per Rule R2, raw_data MAY be empty (omitted entirely or set to {}).",
+          "additionalProperties": true
+        }
+      }
+    },
+    "securityCell": {
+      "type": "object",
+      "title": "Security Facet Cell",
+      "description": "Cell rendering for the Security facet. Per Rule R4 (CVE severity breakdown), severity_counts MUST contain the four canonical severity tiers (critical, high, medium, low) plus a total count — a single aggregate number without severity tiers is a failing state. Per Rule R9 (CVE attribution), scan_metadata is REQUIRED with `timestamp` (ISO 8601) and `sources` (NVD, OSV, or both); undated or unattributed CVE counts are a failing state. Per Rule R3 (grade history fidelity), prior_grade and prior_run_date are present and rendered as `N/A` (with prior_run_date=null) when no prior run exists for the (application, security) pair. Per Rule R2 (facet completeness), the cell renders \"Insufficient Data\" when the CVE pipeline cannot complete (e.g., NVD or OSV API outage that exhausts retry budget); in that case current_grade is `InsufficientData` and the severity_counts object SHOULD reflect zero counts across all tiers but MUST still be present with all five keys (critical, high, medium, low, total) per Rule R4.",
+      "additionalProperties": false,
+      "required": [
+        "current_grade",
+        "prior_grade",
+        "prior_run_date",
+        "severity_counts",
+        "scan_metadata"
+      ],
+      "properties": {
+        "current_grade": {
+          "$ref": "#/$defs/cellGrade"
+        },
+        "prior_grade": {
+          "$ref": "#/$defs/priorCellGrade"
+        },
+        "prior_run_date": {
+          "$ref": "#/$defs/priorRunDate"
+        },
+        "severity_counts": {
+          "type": "object",
+          "title": "CVE Severity Counts (Rule R4)",
+          "description": "Per Rule R4 (CVE severity breakdown), the four-tier severity breakdown plus total is structurally enforced here — see ../template.md § 5 Rules R4 for the canonical rule statement and verification procedure. The five required keys (critical, high, medium, low, total) are mandatory and additionalProperties is false; the schema enforces the Rule R4 structural contract that a single aggregate number without per-tier breakdown is rejected. The four severity-tier keys are lowercase to match conventional JSON property casing while the rendered cell labels in the PDF use the capitalized forms Critical, High, Medium, Low. The total key is the sum of the four severity tier counts; consumers MAY validate this invariant (the schema does not encode the equality structurally because JSON Schema cannot express cross-property arithmetic constraints).",
+          "additionalProperties": false,
+          "required": [
+            "critical",
+            "high",
+            "medium",
+            "low",
+            "total"
+          ],
+          "properties": {
+            "critical": {
+              "type": "integer",
+              "minimum": 0,
+              "title": "Critical Severity Count",
+              "description": "Count of CVE findings in the Critical severity tier (CVSS v3.1 base score 9.0–10.0) per the canonical CVSS-to-Severity mapping in ../docs/facets.md § Security Summary."
+            },
+            "high": {
+              "type": "integer",
+              "minimum": 0,
+              "title": "High Severity Count",
+              "description": "Count of CVE findings in the High severity tier (CVSS v3.1 base score 7.0–8.9) per the canonical CVSS-to-Severity mapping in ../docs/facets.md § Security Summary."
+            },
+            "medium": {
+              "type": "integer",
+              "minimum": 0,
+              "title": "Medium Severity Count",
+              "description": "Count of CVE findings in the Medium severity tier (CVSS v3.1 base score 4.0–6.9) per the canonical CVSS-to-Severity mapping in ../docs/facets.md § Security Summary."
+            },
+            "low": {
+              "type": "integer",
+              "minimum": 0,
+              "title": "Low Severity Count",
+              "description": "Count of CVE findings in the Low severity tier (CVSS v3.1 base score 0.1–3.9) per the canonical CVSS-to-Severity mapping in ../docs/facets.md § Security Summary."
+            },
+            "total": {
+              "type": "integer",
+              "minimum": 0,
+              "title": "Total CVE Count",
+              "description": "Total count of CVE findings for this application — equal to the sum of critical + high + medium + low. Per Rule R4, total is reported alongside (not in place of) the per-tier counts; total alone is a failing state. Consumers MAY validate the total = critical + high + medium + low equality (the schema does not encode this structurally because JSON Schema cannot express cross-property arithmetic constraints)."
+            }
+          }
+        },
+        "scan_metadata": {
+          "$ref": "#/$defs/scanMetadata"
+        }
+      }
+    },
+    "complexityCell": {
+      "type": "object",
+      "title": "Complexity Facet Cell",
+      "description": "Cell rendering for the Complexity facet. Per Rule R5 (Complexity placeholder integrity), current_grade is locked to `TBD` (and the cell renders the verbatim placeholder label `Grade: TBD — definition pending`) until an explicit Complexity rubric is supplied by the user. The cell is rendered with the placeholder label alongside the raw proxy metrics (LOC, file count, contributor count) per the user prompt § 3.2 Facet Analysis. Per Rule R5 verbatim: \"The column MUST NOT be removed, collapsed, or backfilled with an inferred grade until an explicit rubric is provided by the user.\" Per Rule R3 (grade history fidelity), prior_grade and prior_run_date are present and rendered as `N/A` (with prior_run_date=null) when no prior run exists for the (application, complexity) pair. The current_grade enum admits letter grades A–F so the schema remains structurally valid once the user supplies a Complexity rubric — the Rule R5 lock to TBD is enforced by the grading engine and the rendering layer per ../docs/grading-engine.md § Complexity Lock, not by this schema.",
+      "additionalProperties": false,
+      "required": [
+        "current_grade",
+        "prior_grade",
+        "prior_run_date",
+        "placeholder_label",
+        "raw_metrics"
+      ],
+      "properties": {
+        "current_grade": {
+          "$ref": "#/$defs/cellGrade"
+        },
+        "prior_grade": {
+          "$ref": "#/$defs/priorCellGrade"
+        },
+        "prior_run_date": {
+          "$ref": "#/$defs/priorRunDate"
+        },
+        "placeholder_label": {
+          "type": "string",
+          "title": "Placeholder Label (Rule R5)",
+          "description": "Per Rule R5 (Complexity placeholder integrity): the canonical placeholder label rendered alongside the raw proxy metrics in the Complexity cell. The canonical value is the verbatim string \"Grade: TBD — definition pending\" with the em-dash character U+2014 (—) preserved byte-for-byte. The const constraint enforces this verbatim preservation structurally — any deviation (using a hyphen-minus instead of an em-dash, altered spacing, different capitalization) is a schema validation failure. The string MUST appear exactly as specified in the user prompt § 3.2 Facet Analysis Complexity row.",
+          "const": "Grade: TBD — definition pending"
+        },
+        "raw_metrics": {
+          "type": "object",
+          "title": "Complexity Raw Proxy Metrics (Rule R5)",
+          "description": "Per Rule R5 (Complexity placeholder integrity), the raw proxy metrics rendered in the Complexity cell are LOC (lines of code), file count, and contributor count from git history — see ../template.md § 5 Rules R5 for the canonical rule statement. The three required keys are mandatory and additionalProperties is false; the schema enforces the Rule R5 structural contract that the Complexity cell renders these three raw proxy metrics alongside the canonical placeholder label until an explicit Complexity rubric is supplied by the user. These metrics are the unaggregated raw inputs that a future Complexity rubric will grade once supplied; until then they are surfaced directly in the rendered cell per ../docs/facets.md § Complexity Summary.",
+          "additionalProperties": false,
+          "required": [
+            "loc",
+            "file_count",
+            "contributor_count"
+          ],
+          "properties": {
+            "loc": {
+              "type": "integer",
+              "minimum": 0,
+              "title": "Lines of Code (LOC)",
+              "description": "Total lines of code in the application. The LOC counting rule is documented in ../docs/facets.md § Complexity Summary § LOC Counting Rule (the canonical rule counts non-blank, non-comment source lines across all detected language file extensions; binary files, generated files, and vendored / third-party files are excluded)."
+            },
+            "file_count": {
+              "type": "integer",
+              "minimum": 0,
+              "title": "File Count",
+              "description": "Total source file count in the application. The file counting rule is documented in ../docs/facets.md § Complexity Summary § File Count Rule (the canonical rule counts files matching the detected language file extensions; binary files, generated files, and vendored / third-party files are excluded)."
+            },
+            "contributor_count": {
+              "type": "integer",
+              "minimum": 0,
+              "title": "Contributor Count",
+              "description": "Distinct contributor count from the application's git history. The contributor counting rule is documented in ../docs/facets.md § Complexity Summary § Contributor Count Rule (the canonical rule counts unique committer email addresses across the entire git history; bot identities listed in the configured bot-list are excluded)."
+            }
+          }
+        }
+      }
+    }
+  }
+}

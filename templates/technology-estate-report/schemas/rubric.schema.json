@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:blitzy:technology-estate-report:rubric:v0.1.0",
+  "title": "Technology Estate Report — Rubric Input",
+  "description": "JSON Schema (Draft 2020-12) contract for the user-supplied A–F grading rubric input consumed by the Technology Estate Report Blitzy prompt template package. This schema encodes the structural shape of the rubric document only; threshold semantics are user-supplied at generation time per Rule R1 (rubric editability) — see ../template.md § 5 Rules R1 for the canonical rule statement. The rubric document MAY be authored as YAML or JSON; a YAML document is parsed to JSON before validation against this schema. Worked examples are maintained in ../config/rubric-example.yaml and ../examples/sample-rubric.yaml. The rubric is consumed by the grading engine documented in ../docs/grading-engine.md, which evaluates each rubric entry's `criteria` against the per-application, per-facet raw data emitted by the four facet analyzers (see ../docs/facets.md) and selects the matching letter grade. The Complexity facet rubric is permitted to be empty (an empty array) per Rule R5 (Complexity placeholder integrity); while empty, the Complexity column renders the canonical placeholder label per Rule R5 — see ../template.md § 5 Rules R5 for the canonical rule statement and ../docs/facets.md § Complexity Summary for the rendering contract.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "rubric"
+  ],
+  "properties": {
+    "rubric": {
+      "type": "object",
+      "title": "Rubric",
+      "description": "Container object holding one rubric per facet. Per the user-prompt § 3.2 facet inventory, the four facet keys are the canonical facet identifiers `tech_stack`, `maturity`, `security`, and `complexity`. All four keys MUST be present per Rule R2 (facet completeness) — even an empty Complexity rubric MUST be present as an empty array per Rule R5. The order of keys here mirrors the matrix-table column order specified in ../docs/pdf-output.md § Matrix Table Columns: Tech Stack Summary | Maturity Summary | Security Summary | Complexity Summary.",
+      "additionalProperties": false,
+      "required": [
+        "tech_stack",
+        "maturity",
+        "security",
+        "complexity"
+      ],
+      "properties": {
+        "tech_stack": {
+          "$ref": "#/$defs/facetRubric",
+          "title": "Tech Stack Rubric",
+          "description": "Rubric for the Tech Stack Summary facet. Each entry defines criteria mapping detected tech-stack characteristics — language % share by file count, cloud provider identification from IaC resource types, and vendor/framework extraction from dependency manifests — to an A–F letter grade. See ../docs/facets.md § Tech Stack Summary for the underlying detection rules and ../docs/grading-engine.md for the evaluation procedure."
+        },
+        "maturity": {
+          "$ref": "#/$defs/facetRubric",
+          "title": "Maturity Rubric",
+          "description": "Rubric for the Maturity Summary facet. Each entry defines criteria mapping library and runtime EOL status (per the endoflife.date API v1 lookup documented in ../docs/api-integrations.md) and vendor version staleness to an A–F letter grade. Verbatim worked example from the user prompt: \"No library out of support = A for Maturity\". See ../docs/facets.md § Maturity Summary for the underlying detection rules and ../docs/grading-engine.md for the evaluation procedure."
+        },
+        "security": {
+          "$ref": "#/$defs/facetRubric",
+          "title": "Security Rubric",
+          "description": "Rubric for the Security Summary facet. Each entry defines criteria mapping CVE severity-tier counts (Critical, High, Medium, Low, plus a total count, per Rule R4) to an A–F letter grade. Counts are sourced from NVD CVE API v2.0 and OSV API v1 lookups against a CycloneDX SBOM, with attribution per Rule R9. See ../docs/facets.md § Security Summary and ../docs/api-integrations.md for the SBOM-to-CVE pipeline and the CVSS-to-severity-tier mapping."
+        },
+        "complexity": {
+          "$ref": "#/$defs/facetRubricComplexity",
+          "title": "Complexity Rubric",
+          "description": "Rubric for the Complexity Summary facet. Per Rule R5 (Complexity placeholder integrity), this rubric is permitted to be empty (an empty array) until the user supplies explicit thresholds. While empty, the Complexity column renders the placeholder label \"Grade: TBD — definition pending\" alongside the raw proxy metrics (LOC, file count, contributor count) and the column MUST NOT be removed, collapsed, or backfilled with an inferred grade. When the user later supplies Complexity thresholds, each entry follows the same shape as the other facet rubrics (#/$defs/rubricEntry)."
+        }
+      }
+    }
+  },
+  "$defs": {
+    "facetRubric": {
+      "type": "array",
+      "title": "Facet Rubric",
+      "description": "An ordered array of rubric entries, one per A–F letter grade. The conventional layout is to provide one entry per grade A, B, C, D, and F. Entry order is significant: the grading engine evaluates entries from most-stringent (typically grade A) to least-stringent (typically grade F) and emits the first matching grade per ../docs/grading-engine.md § Evaluation Procedure. At minimum one entry is required to make the rubric usable for the facet. Used by the Tech Stack, Maturity, and Security facets.",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/rubricEntry"
+      }
+    },
+    "facetRubricComplexity": {
+      "type": "array",
+      "title": "Complexity Facet Rubric (Optional)",
+      "description": "Same shape as #/$defs/facetRubric but with `minItems: 0` to honor Rule R5: the Complexity column is locked to \"Grade: TBD — definition pending\" until the user supplies explicit thresholds. An empty array is the supported initial state and is the default in ../config/rubric-example.yaml. When the user later supplies Complexity thresholds, each entry follows the same #/$defs/rubricEntry shape as the other facet rubrics. This separate definition is kept distinct from #/$defs/facetRubric so that the Rule R5 exception is explicit and so that a future schema revision can promote Complexity to a mandatory rubric without a structural rewrite.",
+      "minItems": 0,
+      "items": {
+        "$ref": "#/$defs/rubricEntry"
+      }
+    },
+    "rubricEntry": {
+      "type": "object",
+      "title": "Rubric Entry",
+      "description": "A single rubric entry mapping author-supplied criteria to one of the canonical A–F letter grades. Per Rule R1 (rubric editability), the criteria text and the grade-to-criteria mapping are user-authored at generation time; no thresholds are hardcoded in this template. The `criteria` string is human-authored prose evaluated by the grading engine per ../docs/grading-engine.md § Evaluation Procedure. The optional `notes` field is for the rubric author's own reference and is not consumed by the grading engine.",
+      "additionalProperties": false,
+      "required": [
+        "grade",
+        "criteria"
+      ],
+      "properties": {
+        "grade": {
+          "type": "string",
+          "title": "Letter Grade",
+          "description": "One of the canonical A–F letter grades that this rubric entry's `criteria` resolves to when matched. Per Rule R1 the user supplies the criteria-to-grade mapping at generation time. This input enum deliberately excludes the special downstream values `TBD`, `N/A`, and `Insufficient Data`: those values are emitted by the grading engine, the grade-history persistence layer (see ../schemas/grade-history.schema.json), and the PDF renderer (see ../schemas/report-output.schema.json) based on data-availability conditions and the Rule R5 Complexity-lock — they are NEVER supplied by the rubric author.",
+          "enum": [
+            "A",
+            "B",
+            "C",
+            "D",
+            "F"
+          ]
+        },
+        "criteria": {
+          "type": "string",
+          "title": "Grading Criteria",
+          "description": "Human-authored prose criteria evaluated by the grading engine per ../docs/grading-engine.md. Verbatim worked example from the user prompt: \"No library out of support\" (for Maturity grade A). Author free-form criteria here referring to the per-facet raw data described in ../docs/facets.md (e.g., for Maturity: percentage of dependencies past EOL; for Security: CVE counts per severity tier; for Tech Stack: dominant language and presence of supported runtimes). The string MUST be non-empty.",
+          "minLength": 1
+        },
+        "notes": {
+          "type": "string",
+          "title": "Author Notes (optional)",
+          "description": "Optional human-readable notes for the rubric author's reference (rationale, change log, links to internal review documents). Not consumed by the grading engine and not propagated to the rendered PDF or to the grade-history persistence layer."
+        }
+      }
+    }
+  }
+}

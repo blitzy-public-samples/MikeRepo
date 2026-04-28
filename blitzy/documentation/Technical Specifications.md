@@ -4,892 +4,1139 @@
 
 ## 0.1 Intent Clarification
 
+### 0.1.1 Core Documentation Objective
 
-### 0.1.1 Core Feature Objective
+Based on the provided requirements, the Blitzy platform understands that the documentation objective is to author a **standalone, executable Blitzy prompt template** — a structured Markdown/YAML documentation artifact — that, when invoked by Blitzy against ingested GitHub/GitLab repositories, drives the generation of a recurring **PDF Technology Estate Report** for CIO/CTO consumption. The deliverable is *not* runnable application code; it is a versioned set of template, schema, configuration, and supporting documentation files that together form a self-contained, repeatable report-generation specification.
 
-Based on the prompt, the Blitzy platform understands that the new feature requirement is to build a **standalone macOS desktop application**: a general ledger accounting engine purpose-built for institutional and wealth management accounts. This is a greenfield product — the repository contains only a `README.md` at commit `103791c` with no existing source code, dependency manifests, build tooling, or infrastructure definitions.
+**Request Categorization:** Create new documentation (a net-new prompt template product). No prior version of this template exists in the repository; the existing `blitzy/documentation/` folder contains only the WealthLedger Project Guide and Technical Specifications and is unrelated to this template.
 
-The complete feature requirements are:
+**Documentation Type:** Multi-artifact documentation product comprising:
 
-- **General Ledger Accounting Engine** — Implement a double-entry credit/debit system with an immutable transaction log. Restatements are performed exclusively through offsetting entries that reference the original transaction via foreign key. No `UPDATE` or `DELETE` operations are permitted on the `transactions` table.
+- **Prompt Template** — the canonical Blitzy-executable template document
+- **Schema Specifications** — JSON Schema definitions for rubric input, grade-history persistence record, and PDF output contract
+- **Configuration Templates** — YAML config skeletons for facet definitions and rubric inputs
+- **User Guides** — usage, configuration, troubleshooting, and grade-history operations documentation
+- **Architecture Documentation** — component interaction diagrams and data-flow narratives
+- **Examples and Fixtures** — sample rubric inputs, sample PDF mockups, sample grade-history records
 
-- **Institutional and Wealth Account Universe** — Support 100,000 accounts spanning two categories: Institutional accounts (open/closed mutual funds, ETFs, hedge funds) and Wealth accounts (separately managed accounts, unified managed accounts). Each account has a lifecycle status of Active, Inactive, Pending, or Suspended, with batch status updates for up to 1,000 accounts simultaneously.
+**Restated Documentation Requirements:**
 
-- **Per-Account Closed-Book NAV Valuation** — Calculate account values as `Σ(quantity × EOD midpoint) + cash balance`, where EOD midpoint equals `(bid + ask) / 2` and cash position price is fixed at `1.00`. Each account stores its own IANA timezone string and valuation schedule; the `ValuationEngine` must use exclusively the account's stored timezone — never the system clock timezone.
+- The template MUST produce a single PDF output containing exactly two sections in a fixed order: an **Executive Summary** (page 1) followed by an **Application Matrix Table** (subsequent pages)
+- The matrix table MUST contain one row per ingested repository, with the repository full name `org/repo` used as the stable application identity key and the org name used as a secondary grouping label
+- The matrix table MUST contain exactly four facet columns in this order: **Tech Stack Summary | Maturity Summary | Security Summary | Complexity Summary**
+- Each facet cell MUST display a single A–F letter grade derived from a user-supplied rubric, with the **Complexity** facet locked to "Grade: TBD — definition pending" until a rubric is provided
+- Each facet cell MUST display the prior grade and ISO 8601 date inline in the format `B  ←  prev: C  |  2025-10-01`, or `N/A` when no prior run exists
+- The Executive Summary MUST contain: total applications in scope, A–F grade distribution per facet, top Critical/High CVE findings, highest-maturity-risk applications, and net grade improvement/regression trends versus the prior run
+- The template MUST gracefully accept a heterogeneous run scope mixing previously-ingested repositories with net-new repositories, producing `N/A` prior-grade values for the new repositories without disrupting existing grade histories
+- The template MUST be authored as standalone documentation with no dependency on any other Blitzy flow or template, and it MUST consume the existing Blitzy ingestion pipeline read-only
 
-- **Simulated Reference Data** — Generate and ingest synthetic NYSE equity data with a minimum of 500 securities, each containing ticker, name, SOD bid, SOD ask, EOD bid, and EOD ask fields. No real or externally sourced market data is required or permitted.
+**Surfaced Implicit Requirements:**
 
-- **Role-Based Access Control (RBAC)** — Manage users, account groups, and per-user entitlements (READ/CREATE/MODIFY/DELETE) per account group. All data reads must verify user-group entitlement before returning records. Users without READ access receive an empty result set — not an error.
-
-- **Job Scheduler** — Support manually triggered report generation (field selection, account selection, target date, CSV export) and CSV ingestion jobs. No automated cron scheduling.
-
-- **Four SwiftUI Screens** — Admin (user creation, account group creation, entitlement assignment), Search (name/ID/type/group with up to 1,000 results), Accounts Viewer (scrollable list of selected accounts with values, positions, and value dates), Job Scheduler (create and manually trigger report and CSV ingestion jobs).
-
-- **Performance Thresholds** — Full-universe search of 100,000 accounts in under 2 seconds; batch valuation of 1,000 accounts in under 30 seconds; Accounts Viewer initial render of 1,000 accounts in under 1 second; scrolling at 30fps or above; CSV ingestion of files up to 100MB without crash; MySQL RAM footprint under 4GB.
-
-Implicit requirements detected:
-
-- A MySQL database schema migration system to bootstrap the schema from a clean MySQL 8.0 instance
-- A Swift CLI target to generate synthetic NYSE equity CSV data and seed the `reference_data` table
-- Connection pooling and pagination infrastructure to meet the batch memory cap of 1,000 account records in memory simultaneously
-- MySQL index strategy for search fields (account name partial match, account ID exact, account type, account group) to meet the 2-second search threshold across 100,000 accounts
-- bcrypt password hashing implementation for local authentication
-- Atomic transaction support for cached valuation denormalization (updating `accounts` table within the same DB transaction as valuation completion)
+- A **Rubric Input Schema** must be defined and documented because R1 mandates that grade thresholds are not hardcoded — the user supplies them at generation time, which implies a structured, validated input format
+- A **Grade History Persistence Schema** must be defined because R3 requires displaying prior grade and ISO 8601 date inline, which implies durable storage keyed by `(application_id, facet, run_date)` and a documented record format
+- A **CVE Severity Tier Mapping** must be documented because R4 requires reporting counts in exactly four severity tiers (Critical, High, Medium, Low) plus total — implying a deterministic CVSS-score-to-tier mapping table
+- A **Tech Stack Detection Heuristic** must be documented because the Tech Stack Summary requires language % share by file count, cloud provider identification from IaC resource types, and vendor/framework extraction from dependency manifests — each requiring its own documented detection rule set
+- An **Insufficient Data Cell Specification** must be documented because R2 prohibits empty cells and Gate 2 forbids silent suppression — implying every failure mode must surface as the literal cell value `Insufficient Data`
+- A **PDF Section Ordering Specification** must be documented because R8 mandates Executive Summary precedes Matrix Table — implying a documented pagination contract
+- A **Net-New Repository Onboarding Procedure** must be documented because R10 requires the same execution path to handle both first-run and recurring repositories — implying a documented detection mechanism for "first run versus subsequent run" per `(application_id, facet)` pair
+- A **CVE Attribution Footer Specification** must be documented because R9 requires every Security Summary result to carry the scan timestamp (ISO 8601) and source database label (NVD, OSV, or both)
+- A **Validation Harness Specification** must be documented because Gates 1, 2, 8, 9, and 10 require live end-to-end execution against a real repository, zero-warning completion, integration sign-off checks, full component wiring, and a single-command execution path
 
 ### 0.1.2 Special Instructions and Constraints
 
-- **MySQLKit-only persistence**: SwiftData must not appear anywhere in the project. All database interactions must use MySQLKit via Swift Package Manager. Verification: `grep -r "import SwiftData"` returns zero results.
+**CRITICAL Directives Captured Verbatim from User Requirements:**
 
-- **Offline runtime**: The application must function with the network adapter disabled. All data sources (MySQL, CSV files) must be local. Zero network dependencies at runtime.
+- "Build a standalone Blitzy prompt template" — the template must have no dependency on other Blitzy flows or templates
+- "Reports are cumulative" — new repositories appear as new rows in subsequent runs without disrupting existing application grade history
+- "Language and framing MUST be business-outcome-oriented, not technical" — the Executive Summary and Matrix Table cell language must be authored for CIO/CTO consumption, not engineering audiences
+- "Existing Blitzy ingestion pipeline is consumed read-only and left unchanged" — the template's documentation must explicitly forbid modifications to the ingestion pipeline
+- "No features beyond the defined four facets, grading engine, grade history, and PDF output are to be implemented" — the minimal-change mandate constrains the template's scope inventory
+- "The Complexity column MUST be present and MUST render raw proxy metrics (LOC, file count, contributor count) with the label 'Grade: TBD — definition pending'" — the Complexity column must never be removed, collapsed, or backfilled with an inferred grade
 
-- **Equities-only asset class**: The application must reject creation of any position or transaction for a non-equity instrument at the application layer.
+**User-Supplied Verification Rules (preserved EXACTLY for the template body):**
 
-- **Swift 6 strict concurrency**: The Xcode build must produce zero warnings with Swift 6 strict concurrency checking enabled. No `@unchecked Sendable`, no warning suppressions, no `// swiftlint:disable` suppressions that mask architectural issues.
+- "R1 — Rubric editability: The A–F grading rubric MUST be supplied by the report author at generation time. No grade thresholds are hardcoded in the template. Verification: generating a report with two different rubric inputs for the same dataset produces two different grade outputs."
+- "R2 — Facet completeness: All four facet columns MUST be present in every matrix row in every report run. When source data is unavailable for a facet, the cell renders 'Insufficient Data.' Omitting a cell is prohibited. Verification: no matrix cell is empty or absent in any generated PDF."
+- "R3 — Grade history fidelity: Prior grade display MUST include grade letter and ISO 8601 date. When no prior run exists for a facet/application pair, the cell renders 'N/A.' Verification: a second report run for the same repo shows the first run's grade and date inline."
+- "R4 — CVE severity breakdown: Security Summary MUST report CVE counts broken out by severity tier (Critical, High, Medium, Low) plus a total count. A single aggregate number without severity tiers is a failing state. Verification: Security Summary cell contains four severity labels + total for every application."
+- "R5 — Complexity placeholder integrity: The Complexity column MUST be present and MUST render raw proxy metrics (LOC, file count, contributor count) with the label 'Grade: TBD — definition pending.' The column MUST NOT be removed, collapsed, or backfilled with an inferred grade until an explicit rubric is provided by the user. Verification: Complexity column present in every run; no letter grade appears until rubric is supplied."
+- "R6 — SaaS data sourcing: SaaS license data MUST be sourced exclusively from manifests tracked in the repository. No live SaaS vendor API calls are permitted in v1. Verification: template execution produces no outbound calls to SaaS vendor endpoints."
+- "R7 — Application identity stability: The same repository MUST resolve to the same application identifier across all runs. Identity key is the repository full name (org/repo). Changing the key format between runs is prohibited. Verification: grade history for a repo is continuous across three sequential runs with no duplicate or orphaned entries."
+- "R8 — PDF section order: The executive summary MUST precede the matrix table in the PDF. The matrix table MUST NOT be the first content element. Verification: PDF page 1 contains executive summary content; matrix table begins on a subsequent page or section."
+- "R9 — CVE attribution: Every Security Summary result MUST include the scan timestamp (ISO 8601) and the source database (NVD, OSV, or both). Undated or unattributed CVE counts are a failing state. Verification: each Security Summary cell or report footnote contains timestamp and database label."
+- "R10 — New repo compatibility: Template execution MUST succeed when a mix of previously-ingested repos and net-new repos are in scope in the same run. Net-new repos receive 'N/A' for prior grade. Verification: a run containing one existing repo and one new repo produces correct grade history for the existing repo and N/A for the new repo."
 
-- **Batch memory cap**: No UI operation may load more than 1,000 account records into memory simultaneously. Background jobs must paginate at 1,000 records or fewer per page.
+**User-Supplied Validation Gates (preserved EXACTLY for the template body):**
 
-- **Schema referential integrity**: All inter-table relationships enforced via MySQL foreign key constraints. Each primary entity occupies a distinct table with a typed primary key.
+- "Gate 1 — End-to-end boundary verification: The template is NOT complete until it processes at least one real GitHub/GitLab repository and produces a PDF with all four facet columns populated and at least one graded cell. A mock or stub dataset does not satisfy this gate. Verification artifact: generated PDF file from a live repository."
+- "Gate 2 — Zero-warning build: Template execution MUST complete with zero errors and zero warnings. Any CVE database lookup failure, manifest parse error, or grade computation warning MUST surface as an explicit 'Insufficient Data' cell — not a silent omission or suppressed error."
+- "Gate 8 — Integration sign-off checklist (independent of unit test pass rate): Before delivery, all four must be confirmed: Live smoke test, API contract verification, Grade history verification, Rubric verification."
+- "Gate 9 — Integration wiring verification: Every analysis component (tech stack detector, maturity analyzer, CVE scanner, complexity extractor, grading engine, grade persistence store, PDF renderer) MUST be reachable from the template entry point. Each component MUST be exercised by at least one end-to-end test that traverses the full execution chain from template invocation to PDF output. Components that pass unit tests in isolation but are not wired into the execution path do not count as delivered."
+- "Gate 10 — Test execution binding: All validation tests MUST have a single-command execution path that provisions required credentials (GitHub token, CVE DB key), runs the template against a designated test repository, and asserts on the generated PDF content. Tests without a documented execution path are not considered passing validation."
 
-- **Cached valuation denormalization**: The `accounts` table must store a cached latest valuation amount and value date, updated atomically within the same DB transaction as each valuation run completion.
+**User-Supplied Domain Success Criteria (preserved EXACTLY for the template body):**
 
-- **Validation Framework**: The deliverable is not accepted until all validation gates pass — including Gate 1 (end-to-end boundary verification against live MySQL), Gate 2 (zero-warning build), Gate 8 (integration sign-off checklist), Gate 9 (integration wiring verification for all six modules), and Gate 10 (test execution binding via single `xcodebuild test` command with dedicated `accounting_test` schema).
+- "Every repository in scope produces a populated matrix row"
+- "Maturity grade correctly reflects EOL status from endoflife.date for all detected runtimes and libraries"
+- "Security Summary CVE counts match NVD/OSV lookup for a known-vulnerable dependency version"
+- "Grade history is continuous and unbroken across a minimum of three sequential runs on the same repository"
+- "Executive summary renders correct portfolio-level grade distribution counts matching the sum of individual application grades"
 
-- **Single concurrent user**: The system is designed for 1 concurrent user at launch with 300 registered users.
+**Style Preferences (Inferred and Documented):**
 
-- **Target hardware**: Apple Silicon M5, 16GB RAM, macOS Tahoe.
+- **Tone:** Business-outcome-oriented (CIO/CTO consumption); avoid implementation detail in Executive Summary and matrix cell labels
+- **Structure:** Markdown for the prompt template body; YAML for rubric configuration; JSON Schema for persistence records and output contracts; Mermaid for all diagrams
+- **Depth:** Implementation-ready — every facet, every rule, every gate must be documentable and verifiable from the artifact alone
+- **Format:** Default to Markdown with embedded Mermaid diagrams; YAML for structured configuration; JSON Schema for contracts
+
+**Web Search Requirements Documented:**
+
+- Documentation best practices for endoflife.date API v1 usage and rate limits
+- Documentation best practices for NVD CVE API v2.0 usage, rate limits, and CVSS-to-severity tier mapping
+- Documentation best practices for OSV API v1 querying for batched dependency lookups
+- SBOM generation methods (CycloneDX) for the multi-language dependency landscape (npm, pip, Maven, Go, Cargo, NuGet, RubyGems)
+- IaC resource-type catalogs for cloud provider identification (Terraform AWS/Azure/GCP, Helm, CloudFormation)
+- PDF section-ordering and pagination conventions for executive reporting
 
 ### 0.1.3 Technical Interpretation
 
-These feature requirements translate to the following technical implementation strategy:
+These documentation requirements translate to the following technical documentation strategy: produce a *prompt template package* (a versioned directory containing the template document, schemas, configuration skeletons, examples, and supporting documentation) that fully specifies, per the user's rules and gates, how Blitzy must transform a heterogeneous mix of new and previously-ingested GitHub/GitLab repositories into a single deterministic, recurring, and grade-history-preserving CIO/CTO-facing PDF report.
 
-- To **implement the general ledger accounting engine**, we will create the `LedgerEngine` module with a `LedgerService` that enforces balanced debit/credit pairs summing to zero at the application layer before any DB write, and a `DoubleEntryValidator` that rejects unbalanced entries. The `transactions` table will be designed as append-only with no UPDATE or DELETE access. Corrections use offsetting entries referencing the original transaction ID.
+**Requirement-to-Documentation-Action Mapping:**
 
-- To **support 100,000 accounts with performant search**, we will create the `AccountManagement` module with MySQL composite indexes on `(account_name)`, `(account_id)`, `(account_type)`, and `(account_group_id)` columns. Partial name matching uses `LIKE 'prefix%'` with a B-tree index. Result sets are capped at 1,000 records with server-side pagination.
+| User Requirement | Documentation Action |
+|---|---|
+| Standalone executable template | Create `templates/technology-estate-report/template.md` as the canonical Blitzy prompt entry point |
+| Two-section PDF output (executive summary + matrix) | Document the PDF contract in `templates/technology-estate-report/docs/pdf-output.md` and bind it to a JSON Schema in `templates/technology-estate-report/schemas/report-output.schema.json` |
+| Four facet columns (Tech Stack, Maturity, Security, Complexity) | Document each facet's data sources, detection methods, grading inputs, and "Insufficient Data" conditions in `templates/technology-estate-report/docs/facets.md` |
+| User-supplied A–F rubric per facet | Define rubric input format in `templates/technology-estate-report/schemas/rubric.schema.json` and document author-time supply procedure in `templates/technology-estate-report/docs/grading-engine.md` |
+| Grade history with prior grade + ISO 8601 date | Define record schema in `templates/technology-estate-report/schemas/grade-history.schema.json` and document persistence semantics in `templates/technology-estate-report/docs/grade-history.md` |
+| Cumulative reports with new-repo onboarding | Document the heterogeneous-scope execution flow and the `N/A` rendering rule in `templates/technology-estate-report/docs/grade-history.md` |
+| Zero-warning execution with explicit "Insufficient Data" surfacing | Document the failure-handling contract and "Insufficient Data" cell rules in `templates/technology-estate-report/docs/troubleshooting.md` and `template.md` |
+| Single-command validation harness (Gate 10) | Document the execution and verification procedure in `templates/technology-estate-report/docs/validation.md` |
+| Integration wiring verification (Gate 9) | Document the component reachability contract and end-to-end test inventory in `templates/technology-estate-report/docs/architecture.md` |
+| Live API contract verification (Gate 8) | Document GitHub/GitLab, endoflife.date, NVD, and OSV API usage contracts in `templates/technology-estate-report/docs/api-integrations.md` |
 
-- To **implement per-account NAV valuation with timezone awareness**, we will create the `ValuationEngine` module that reads each account's stored IANA timezone string and applies it when computing value dates. The `NAVCalculator` computes `Σ(quantity × EOD midpoint) + cash balance` per account. Cached valuation amounts and value dates are written atomically back to the `accounts` table in the same transaction.
+To document the four-facet matrix, we will create dedicated facet sections within `templates/technology-estate-report/docs/facets.md` and corresponding inline summaries within `template.md`. To document the grading engine, we will create `templates/technology-estate-report/docs/grading-engine.md` paired with the rubric JSON Schema. To document the PDF output, we will create `templates/technology-estate-report/docs/pdf-output.md` paired with the report-output JSON Schema and a sample PDF mockup in `templates/technology-estate-report/examples/sample-pdf-mockup.md`. To document the validation harness, we will create `templates/technology-estate-report/docs/validation.md` and a single-command runbook in the package `README.md`.
 
-- To **deliver RBAC with entitlement enforcement**, we will create the `RBAC` module containing `AuthenticationService` (bcrypt-based local authentication), `EntitlementService` (per-user, per-account-group permission verification), and `PasswordHasher` (bcrypt wrapper). All query paths in `AccountManagement`, `LedgerEngine`, and the UI layer will invoke entitlement checks before returning data.
+### 0.1.4 Inferred Documentation Needs
 
-- To **implement reference data simulation**, we will create the `ReferenceDataService` module with a `SyntheticDataGenerator` Swift CLI target that produces a minimum of 500 NYSE equity records, and a `CSVParser` for ingestion by filename/type/directory.
+Based on the cross-cutting nature of the requirements and the verification gates, the following documentation needs were inferred and added to the documentation scope:
 
-- To **support job scheduling**, we will create the `JobScheduler` module with manually triggered report generation (CSV export with field selection, account selection, target date) and CSV ingestion jobs. No cron automation.
+- **Based on facet definitions:** Each of the four facets has distinct data sources (source files, dependency manifests, IaC configs, git history) and distinct detection methods (file-extension language detection, version-to-EOL lookup, SBOM-to-CVE lookup, raw-metric extraction); each requires its own reference documentation page rather than a single facets summary
+- **Based on R1 + Gate 8 (rubric verification):** The rubric input format must be both human-authorable (YAML for editing) and machine-validatable (JSON Schema for enforcement); both formats require their own documentation
+- **Based on R3 + R7 (identity stability + history fidelity):** The grade history persistence layer requires a dedicated document covering the storage key shape `(application_id, facet, run_date)`, the immutability contract for prior-run records, and the migration policy for cumulative runs
+- **Based on R6 + R9 (SaaS sourcing + CVE attribution):** A network-egress allow-list document is required to enumerate which API endpoints the template is permitted to call (GitHub/GitLab, endoflife.date, NVD, OSV) and which it is forbidden to call (live SaaS vendor endpoints)
+- **Based on R10 (new repo compatibility):** A heterogeneous-scope execution narrative is required to describe how Blitzy detects whether each repository in the run scope has a prior history record, and the deterministic flow for first-run versus recurring-run handling
+- **Based on Gate 1 (live smoke test):** A live smoke-test runbook is required, including the required GitHub/GitLab credentials, a designated test repository pointer, the expected PDF artifact location, and the assertions a reviewer must perform on the generated PDF
+- **Based on Gate 9 (integration wiring):** A component-reachability matrix is required, listing each of the seven analysis components (tech stack detector, maturity analyzer, CVE scanner, complexity extractor, grading engine, grade persistence store, PDF renderer) and the end-to-end test that exercises it
+- **Based on the executive summary content list:** A portfolio-level aggregation specification is required, documenting how grade distribution counts are computed, how "top" CVE findings are ranked and limited, how "highest-maturity-risk" applications are scored and ranked, and how trend-versus-prior-run is computed at the portfolio level
+- **Based on Gate 2 (zero-warning build):** A failure-mode inventory is required, mapping every potential failure (CVE DB lookup timeout, manifest parse error, EOL lookup miss, missing IaC config, git history unavailable) to its specific "Insufficient Data" cell rendering
+- **Based on the four-facet matrix-table contract:** A cell-rendering specification is required for the inline "current grade ← prev: prior_grade | ISO 8601 date" format, including font-weight emphasis on the current grade and the secondary-text styling of the prior-grade segment
 
-- To **build the four SwiftUI screens**, we will create the `UILayer` module with `AdminView`, `SearchView`, `AccountsViewerView`, and `JobSchedulerView` — each wired to the corresponding backend module and reachable from the `@main` entry point.
+## 0.2 Documentation Discovery and Analysis
 
-- To **meet all performance thresholds**, we will implement MySQL index optimization, connection pooling via MySQLKit/AsyncKit, lazy loading with pagination at 1,000 records per page, and SwiftUI `LazyVStack` for scrollable lists.
+### 0.2.1 Existing Documentation Infrastructure Assessment
 
-- To **establish the persistence layer**, we will create a `Persistence` module with `DatabaseManager` (MySQLKit configuration and connection management), `ConnectionPool` (AsyncKit-based pooling), repository classes for each entity, and a `MigrationManager` that executes SQL DDL scripts in order.
+Repository analysis reveals an extensive documentation framework already established for the WealthLedger Swift application but **no pre-existing infrastructure for prompt templates** of any kind. This is therefore a greenfield documentation task: the template package will be created from scratch in a new top-level directory.
 
+**Current Repository Documentation Layout (Discovered via Repository Inspection):**
 
-## 0.2 Repository Scope Discovery
+| Discovered Location | Type | Purpose | Relevance to This Task |
+|---|---|---|---|
+| `README.md` (root) | Markdown | WealthLedger onboarding guide | Reference only — not modified |
+| `Docs/architecture.md` | Markdown | WealthLedger 11-module architecture | Reference only — example of repository documentation style |
+| `Docs/database_schema.md` | Markdown | WealthLedger MySQL schema | Reference only |
+| `Docs/user_guide.md` | Markdown | WealthLedger end-user guide | Reference only |
+| `blitzy/documentation/Project Guide.md` | Markdown | WealthLedger operating manual | Reference only |
+| `blitzy/documentation/Technical Specifications.md` | Markdown | WealthLedger engineering blueprint | Reference only — example of section-numbered tech spec authoring |
 
+**Documentation Generator Configuration:**
 
-### 0.2.1 Comprehensive File Analysis
+- **No Markdown renderer configured** — the existing `Docs/` content is consumed directly as Markdown without static-site generation
+- **No mkdocs, Docusaurus, Sphinx, or similar generator** is present in the repository
+- **No prompt-template folder** (`templates/`, `prompts/`) exists at any depth
 
-The repository is in a **greenfield state** — containing only `README.md` (content: `# MikeRepo`) at commit `103791c`. There are no existing source files, dependency manifests, build configurations, test files, CI/CD pipelines, or documentation to modify. All files listed below represent new creations.
+**API Documentation Tooling:**
 
-**Existing files (modification required):**
+- **No JSDoc, Sphinx, Godoc, or TypeDoc** configurations are present
+- **Swift DocC** is the native option for the WealthLedger codebase but has not been wired up; it is not relevant to this template package, which is itself documentation-only
 
-| File | Action | Purpose |
-|------|--------|---------|
-| `README.md` | MODIFY | Replace placeholder content with project documentation, build instructions, database setup guide, and architecture overview |
+**Diagram Tools Detected:**
 
-**New project configuration files to create:**
+- **Mermaid** is the convention used throughout the existing tech spec — every diagram in `blitzy/documentation/Technical Specifications.md` uses fenced `mermaid` code blocks; this convention will be carried forward into the new template package
 
-| File | Purpose |
-|------|---------|
-| `Package.swift` | Swift Package Manager manifest defining targets, dependencies (MySQLKit, BCryptSwift, swift-nio), and platform requirements |
-| `WealthLedger.xcodeproj/` | Xcode project directory with build schemes for the main app, CLI seed tool, unit tests, and integration tests |
-| `.gitignore` | Git ignore rules for Xcode artifacts, build products, `.DS_Store`, `DerivedData/` |
-| `.swiftlint.yml` | SwiftLint configuration enforcing project coding standards |
-| `.swift-format` | Swift format configuration for consistent code style |
+**Documentation Hosting / Deployment:**
 
-**New source files — Main Application Target (`Sources/WealthLedgerApp/`):**
+- **None** — documentation is consumed directly from the repository in Markdown form
 
-| File | Purpose |
-|------|---------|
-| `Sources/WealthLedgerApp/WealthLedgerApp.swift` | `@main` entry point; initializes database connection, sets up dependency container, launches root SwiftUI view |
-| `Sources/WealthLedgerApp/AppState.swift` | Observable application state: current user session, navigation state, selected accounts |
-| `Sources/WealthLedgerApp/DependencyContainer.swift` | Service locator registering all module services for dependency injection |
+**Conclusion:** The new template package will follow the existing repository's Markdown-with-Mermaid convention but must be self-contained: it will not modify, depend on, or extend any of the WealthLedger documentation artifacts above.
 
-**New source files — AccountManagement Module (`Sources/AccountManagement/`):**
+### 0.2.2 Repository Code Analysis for Documentation
 
-| File | Purpose |
-|------|---------|
-| `Sources/AccountManagement/Models/Account.swift` | Account data model: ID, name, fund type, ownership details, timezone (IANA), valuation schedule, cached valuation amount/date, status |
-| `Sources/AccountManagement/Models/AccountGroup.swift` | Account group data model: group ID, name, metadata |
-| `Sources/AccountManagement/Models/AccountStatus.swift` | Enum: Active, Inactive, Pending, Suspended with batch update support |
-| `Sources/AccountManagement/Models/FundType.swift` | Enum covering Institutional (open/closed mutual funds, ETFs, hedge funds) and Wealth (SMAs, UMAs) categories |
-| `Sources/AccountManagement/Services/AccountService.swift` | CRUD operations on accounts with entitlement checks, batch status update, search with pagination |
-| `Sources/AccountManagement/Services/AccountGroupService.swift` | CRUD operations on account groups |
+Because this is a new prompt template package — not documentation of existing code — there is no source code in this repository to be documented. The "code" being documented is the *behavior of the Blitzy execution engine* when it interprets the new template against ingested repositories. The repository inspection therefore focuses on confirming the **absence** of conflicting prior artifacts and confirming the documentation-style baseline.
 
-**New source files — LedgerEngine Module (`Sources/LedgerEngine/`):**
+**Search Patterns Executed:**
 
-| File | Purpose |
-|------|---------|
-| `Sources/LedgerEngine/Models/Transaction.swift` | Immutable transaction model: ID, account FK, instrument, quantity, asset type, ownership percentage, debit/credit amounts, restatement reference FK |
-| `Sources/LedgerEngine/Models/Position.swift` | Position model: ID, account FK, instrument FK, quantity, asset type |
-| `Sources/LedgerEngine/Services/LedgerService.swift` | Transaction posting with double-entry validation, offsetting entry creation for restatements |
-| `Sources/LedgerEngine/Services/DoubleEntryValidator.swift` | Validates that every transaction set sums to zero (debits = credits) before DB write |
+- Search for any existing `templates/` or `prompts/` directory — **none found**
+- Search for any `.blitzyignore` files — **none found** anywhere on the filesystem
+- Search for any prior PDF-report or technology-estate-report artifacts — **none found**
+- Search for any rubric, grading-engine, or grade-history schema files — **none found**
+- Search for any GitHub/GitLab API integration code or documentation in this repository — **none found** (out of scope; the repository is a Swift macOS application)
 
-**New source files — ValuationEngine Module (`Sources/ValuationEngine/`):**
+**Key Directories Examined:**
 
-| File | Purpose |
-|------|---------|
-| `Sources/ValuationEngine/Models/Valuation.swift` | Valuation result model: account ID, value amount, value date, timezone, positions valued |
-| `Sources/ValuationEngine/Services/ValuationService.swift` | Orchestrates batch valuation: loads positions, retrieves EOD prices, invokes NAVCalculator, writes cached results atomically |
-| `Sources/ValuationEngine/Services/NAVCalculator.swift` | Pure calculation: `Σ(quantity × (EOD_bid + EOD_ask) / 2) + cash_balance`; cash price fixed at 1.00 |
-
-**New source files — ReferenceDataService Module (`Sources/ReferenceDataService/`):**
-
-| File | Purpose |
-|------|---------|
-| `Sources/ReferenceDataService/Models/ReferenceData.swift` | Reference data model: ticker, name, SOD bid/ask, EOD bid/ask, market date |
-| `Sources/ReferenceDataService/Services/ReferenceDataService.swift` | Query reference data, manage market data records |
-| `Sources/ReferenceDataService/Services/CSVParser.swift` | Parse CSV files by filename/type/directory; validate column structure; paginated ingestion for files up to 100MB |
-| `Sources/ReferenceDataService/Services/CSVExporter.swift` | Export report data to CSV format with configurable field selection |
-| `Sources/ReferenceDataService/Generators/SyntheticDataGenerator.swift` | Generate 500+ synthetic NYSE equity records with realistic ticker, name, and six price fields |
-
-**New source files — JobScheduler Module (`Sources/JobScheduler/`):**
-
-| File | Purpose |
-|------|---------|
-| `Sources/JobScheduler/Models/Job.swift` | Job model: ID, type (report/ingestion), status, parameters (field selection, account selection, target date), timestamps |
-| `Sources/JobScheduler/Services/JobSchedulerService.swift` | Job lifecycle management: create, execute, track status; manual trigger only |
-| `Sources/JobScheduler/Services/ReportGenerator.swift` | Generate CSV reports with field selection, account filtering, date targeting |
-
-**New source files — RBAC Module (`Sources/RBAC/`):**
-
-| File | Purpose |
-|------|---------|
-| `Sources/RBAC/Models/User.swift` | User model: ID, username, bcrypt-hashed password |
-| `Sources/RBAC/Models/Entitlement.swift` | Entitlement model: user ID FK, account group ID FK, permission flags (READ/CREATE/MODIFY/DELETE) |
-| `Sources/RBAC/Services/AuthenticationService.swift` | Local authentication: username/password verification against bcrypt hashes; session management |
-| `Sources/RBAC/Services/EntitlementService.swift` | Entitlement queries: check user permissions per account group, filter accessible account groups per user |
-| `Sources/RBAC/Services/PasswordHasher.swift` | bcrypt hashing wrapper using BCryptSwift library |
-
-**New source files — UILayer Module (`Sources/UILayer/`):**
-
-| File | Purpose |
-|------|---------|
-| `Sources/UILayer/AdminScreen/AdminView.swift` | Admin screen: user creation, account group creation, entitlement assignment (RCMD per user-group pair) |
-| `Sources/UILayer/SearchScreen/SearchView.swift` | Search screen: search by name/ID/type/group, select up to 1,000 accounts for viewing |
-| `Sources/UILayer/AccountsViewer/AccountsViewerView.swift` | Accounts Viewer: scrollable `LazyVStack` list of selected accounts with name, ID, value, positions, value date |
-| `Sources/UILayer/JobSchedulerScreen/JobSchedulerView.swift` | Job Scheduler screen: create report and CSV ingestion jobs, manual trigger |
-| `Sources/UILayer/Navigation/MainNavigationView.swift` | Root navigation: tab or sidebar layout routing to all four screens |
-| `Sources/UILayer/Components/AccountRowView.swift` | Reusable row component for account display in lists |
-| `Sources/UILayer/Components/PositionDetailView.swift` | Position detail view showing instrument and quantity per account |
-| `Sources/UILayer/Components/EntitlementFormView.swift` | Reusable form for assigning READ/CREATE/MODIFY/DELETE permissions |
-
-**New source files — Persistence Module (`Sources/Persistence/`):**
-
-| File | Purpose |
-|------|---------|
-| `Sources/Persistence/DatabaseManager.swift` | MySQLKit configuration, connection lifecycle, schema initialization |
-| `Sources/Persistence/ConnectionPool.swift` | AsyncKit-based connection pool management |
-| `Sources/Persistence/MigrationManager.swift` | Execute ordered SQL migration scripts against the database |
-| `Sources/Persistence/Repositories/AccountRepository.swift` | Account table CRUD, search queries with indexes, batch operations |
-| `Sources/Persistence/Repositories/TransactionRepository.swift` | Append-only transaction inserts, offsetting entry creation |
-| `Sources/Persistence/Repositories/PositionRepository.swift` | Position CRUD with FK enforcement |
-| `Sources/Persistence/Repositories/UserRepository.swift` | User CRUD with password hash storage |
-| `Sources/Persistence/Repositories/EntitlementRepository.swift` | Entitlement CRUD, permission flag queries |
-| `Sources/Persistence/Repositories/AccountGroupRepository.swift` | Account group CRUD |
-| `Sources/Persistence/Repositories/ReferenceDataRepository.swift` | Reference data bulk insert, EOD price queries |
-
-**New source files — Shared Module (`Sources/Shared/`):**
-
-| File | Purpose |
-|------|---------|
-| `Sources/Shared/Extensions/Date+Timezone.swift` | Date utilities: convert between IANA timezones, compute value dates per account timezone |
-| `Sources/Shared/Extensions/Decimal+Currency.swift` | Decimal precision utilities for financial calculations |
-| `Sources/Shared/Protocols/RepositoryProtocol.swift` | Generic repository protocol for consistent data access patterns |
-| `Sources/Shared/Constants.swift` | Application-wide constants: batch size (1,000), max search results, default pagination |
-| `Sources/Shared/Errors/AppError.swift` | Typed error hierarchy for domain-specific error handling |
-
-**New source files — CLI Seed Tool (`Sources/SeedTool/`):**
-
-| File | Purpose |
-|------|---------|
-| `Sources/SeedTool/SeedToolMain.swift` | `@main` CLI entry point: generate synthetic NYSE CSV, seed `reference_data` with 500+ rows, optionally seed sample accounts |
-
-**New SQL Migration Files (`Resources/Migrations/`):**
-
-| File | Purpose |
-|------|---------|
-| `Resources/Migrations/001_create_users.sql` | Users table DDL with bcrypt password column |
-| `Resources/Migrations/002_create_account_groups.sql` | Account groups table DDL |
-| `Resources/Migrations/003_create_entitlements.sql` | Entitlements table DDL with FKs to users and account_groups |
-| `Resources/Migrations/004_create_accounts.sql` | Accounts table DDL with fund type, timezone, cached valuation, status, FK to account_groups |
-| `Resources/Migrations/005_create_reference_data.sql` | Reference data table DDL with ticker/price columns and market date |
-| `Resources/Migrations/006_create_positions.sql` | Positions table DDL with FKs to accounts and reference_data |
-| `Resources/Migrations/007_create_transactions.sql` | Transactions table DDL with immutability constraints, restatement FK, FKs to accounts |
-| `Resources/Migrations/008_create_indexes.sql` | Composite indexes for search optimization and performance thresholds |
-
-**New test files:**
-
-| File | Purpose |
-|------|---------|
-| `Tests/UnitTests/LedgerEngineTests/DoubleEntryValidatorTests.swift` | Validate balanced/unbalanced entry rejection logic |
-| `Tests/UnitTests/LedgerEngineTests/LedgerServiceTests.swift` | Validate transaction creation and restatement logic |
-| `Tests/UnitTests/ValuationEngineTests/NAVCalculatorTests.swift` | Validate NAV formula: `Σ(qty × midpoint) + cash` |
-| `Tests/UnitTests/ValuationEngineTests/ValuationServiceTests.swift` | Validate timezone-aware valuation date computation |
-| `Tests/UnitTests/RBACTests/AuthenticationTests.swift` | Validate bcrypt hash/verify cycle |
-| `Tests/UnitTests/RBACTests/EntitlementTests.swift` | Validate permission flag checks |
-| `Tests/UnitTests/AccountManagementTests/AccountServiceTests.swift` | Validate search, status updates, CRUD |
-| `Tests/UnitTests/ReferenceDataTests/CSVParserTests.swift` | Validate CSV parsing, column validation |
-| `Tests/IntegrationTests/TestDatabaseSetup.swift` | Create `accounting_test` schema, run migrations, teardown after tests |
-| `Tests/IntegrationTests/EndToEndWorkflowTests.swift` | Gate 1: create account → post transaction → run valuation → verify in viewer |
-| `Tests/IntegrationTests/AccountManagementIntegrationTests.swift` | Account CRUD against live MySQL |
-| `Tests/IntegrationTests/LedgerIntegrationTests.swift` | Transaction posting against live MySQL |
-| `Tests/IntegrationTests/ValuationIntegrationTests.swift` | Valuation run against live MySQL with timezone verification |
-| `Tests/IntegrationTests/RBACIntegrationTests.swift` | Entitlement enforcement against live MySQL |
-| `Tests/IntegrationTests/ReferenceDataIntegrationTests.swift` | CSV ingestion and reference data seeding against live MySQL |
-| `Tests/IntegrationTests/JobSchedulerIntegrationTests.swift` | Job creation and execution against live MySQL |
-
-**New documentation and scripts:**
-
-| File | Purpose |
-|------|---------|
-| `Scripts/setup_database.sh` | Shell script to initialize MySQL 8.0, create schema, run migrations |
-| `Docs/architecture.md` | Module dependency diagram, data flow, integration points |
-| `Docs/database_schema.md` | Complete ERD, table definitions, FK relationships, index strategy |
-| `Docs/user_guide.md` | End-user documentation for all four screens |
-
-### 0.2.2 Web Search Research Conducted
-
-The following research was conducted to validate technology choices and versions:
-
-- **Swift version landscape** — Swift 6.3 was released March 24, 2026, and is the latest stable release. It is included in Xcode 26.4. Swift 6.2 was released September 15, 2025. Swift 6.1 was released March 31, 2025. The user specifies "Swift 6.x" which maps to Swift 6.3 as the latest release with Xcode 26.4 on macOS Tahoe.
-
-- **macOS Tahoe** — macOS Tahoe (version 26) was released September 15, 2025, with the latest update being 26.4.1 (April 9, 2026). It supports Apple Silicon M5 chips. The M5 MacBook Pro was announced October 2025 and the M5 MacBook Air in early 2026.
-
-- **Xcode version** — Xcode 26.4 is the current release, including Swift 6.3 and macOS 26.4 SDK. It runs on macOS Tahoe 26.2 or later.
-
-- **MySQLKit** — The latest release is MySQLKit 4.9.0 from the Vapor project. It is a pure Swift MySQL client using MySQLNIO for asynchronous communication and AsyncKit for connection pooling. Its `Package.swift` requires swift-tools-version 5.10 with dependencies on async-kit 1.20.0, mysql-nio 1.7.2, sql-kit 3.33.0, swift-crypto 2.0.0..<4.0.0, swift-nio 2.82.0, and swift-nio-ssl 2.30.0.
-
-- **BCrypt for Swift** — BCryptSwift v2.0.1 is a pure Swift bcrypt implementation compatible with Swift 6.2/6.1/6.0/5.10, available via SPM. It has no external dependencies, making it suitable for the offline runtime requirement.
-
-- **MySQL 8.0 on macOS** — Installed via Homebrew with `brew install mysql@8.0`. MySQL 8.0 is the specified version for local development on macOS Tahoe.
-
-### 0.2.3 New File Requirements
-
-Since this is a greenfield project, all files are new creations. The complete project will contain approximately:
-
-- **5 project configuration files** (Package.swift, .xcodeproj, .gitignore, .swiftlint.yml, .swift-format)
-- **3 main app target files** (entry point, app state, dependency container)
-- **6 AccountManagement files** (4 models, 2 services)
-- **4 LedgerEngine files** (2 models, 2 services)
-- **3 ValuationEngine files** (1 model, 2 services)
-- **5 ReferenceDataService files** (1 model, 3 services, 1 generator)
-- **3 JobScheduler files** (1 model, 2 services)
-- **5 RBAC files** (2 models, 3 services)
-- **8 UILayer files** (4 screens, 1 navigation, 3 components)
-- **10 Persistence files** (3 infrastructure, 7 repositories)
-- **5 Shared files** (2 extensions, 1 protocol, 1 constants, 1 errors)
-- **1 SeedTool CLI file**
-- **8 SQL migration files**
-- **17 test files** (8 unit, 8 integration, 1 test setup)
-- **4 documentation/script files**
-
-**Total: approximately 87 files** composing the complete application.
-
-
-## 0.3 Dependency Inventory
-
-
-### 0.3.1 Private and Public Packages
-
-All dependencies are public, open-source packages distributed via Swift Package Manager. No private packages are required. The user specifies MySQLKit as the sole database access layer and bcrypt for password hashing. All versions below are verified against published releases.
-
-| Registry | Package | Version | License | Purpose |
-|----------|---------|---------|---------|---------|
-| SPM (GitHub) | `vapor/mysql-kit` | 4.9.0 | MIT | SQLKit driver for MySQL; serializes MySQL-dialect SQL queries; wraps MySQLNIO for async communication |
-| SPM (GitHub) | `vapor/mysql-nio` | 1.7.2 | MIT | Low-level async MySQL protocol implementation using SwiftNIO |
-| SPM (GitHub) | `vapor/sql-kit` | 3.33.0 | MIT | SQL query builder abstraction used by MySQLKit |
-| SPM (GitHub) | `vapor/async-kit` | 1.20.0 | MIT | Connection pooling (EventLoopGroupConnectionPool) for MySQLKit |
-| SPM (GitHub) | `apple/swift-crypto` | 3.4.0 | Apache-2.0 | Cryptographic primitives required by MySQLKit authentication |
-| SPM (GitHub) | `apple/swift-nio` | 2.82.0 | Apache-2.0 | Non-blocking event-driven networking foundation for MySQLNIO |
-| SPM (GitHub) | `apple/swift-nio-ssl` | 2.30.0 | Apache-2.0 | TLS support for MySQL connections |
-| SPM (GitHub) | `apple/swift-log` | 1.6.0 | Apache-2.0 | Structured logging API used by MySQLKit/SwiftNIO |
-| SPM (GitHub) | `apple/swift-atomics` | 1.2.0 | Apache-2.0 | Low-level atomic operations required by SwiftNIO |
-| SPM (GitHub) | `apple/swift-collections` | 1.1.0 | Apache-2.0 | Ordered collections used by SwiftNIO internals |
-| SPM (GitHub) | `wisetail/BCryptSwift` | 2.0.1 | MIT | Pure Swift bcrypt implementation for password hashing; no external dependencies |
-| Homebrew | `mysql@8.0` | 8.0.x | GPL-2.0 | Local MySQL 8.0 database server installed via `brew install mysql@8.0` |
-| Built-in | SwiftUI | macOS 26 SDK | Apple | Native macOS UI framework — ships with Xcode 26.4, no SPM dependency required |
-| Built-in | Foundation | macOS 26 SDK | Apple | Core Swift framework for dates, timezones, file I/O, JSON — no SPM dependency required |
-| Built-in | Swift Testing | Swift 6.3 | Apache-2.0 | Test framework included with Swift 6.3 toolchain |
-
-**Dependency Graph (direct SPM declarations in `Package.swift`):**
+| Directory | Examined Contents | Relevance |
+|---|---|---|
+| `/` (root) | `Package.swift`, `README.md`, `.swiftlint.yml`, `.gitignore`, `.swift-format` | Confirms Swift macOS project conventions; documentation must be sibling-directory to existing folders, not nested inside `Sources/` or `Tests/` |
+| `Docs/` | `architecture.md`, `database_schema.md`, `user_guide.md` | Establishes the documentation prose style (technical, evidence-cited, Mermaid-illustrated) that the new template package will mirror |
+| `blitzy/documentation/` | `Project Guide.md`, `Technical Specifications.md` | Establishes the section-numbered tech-spec style; the new template package is a separate, standalone product and will not be co-located here |
+| `Resources/Migrations/` | 8 ordered SQL migration files | Out of scope; unrelated to the new template |
+| `Sources/` | 11 Swift module directories | Out of scope; Swift application code is unrelated to the prompt template |
+| `Tests/` | Integration and unit Swift tests | Out of scope |
+
+**Related Documentation Found:** None. The new template package is greenfield with no prior version, no precursor documentation, and no overlapping artifacts in the repository.
+
+### 0.2.3 Web Search Research Conducted
+
+External research was conducted to validate the API contracts and tool versions documented in the template package. Findings inform the `docs/api-integrations.md` documentation file and the `Dependency Inventory` sub-section of this Agent Action Plan.
+
+**endoflife.date API Research:**
+
+- <cite index="3-1,3-2,3-3">An API is available for integration with CI platforms. API documentation is available at https://endoflife.date/docs/api/v1/. The API is currently in Beta, and breaking changes can happen.</cite>
+- <cite index="10-2">The endoflife.date API consists of static JSON files generated during the Jekyll build process.</cite>
+- <cite index="5-7,5-8">It also makes the data available using an easily accessible API and has iCalendar support. endoflife.date currently tracks 454 products.</cite>
+- API base path used by the template: `https://endoflife.date/api/v1/products/{product}/` (per the v1 documentation site)
+- <cite index="10-3">Authentication Info: Currently no authentication required</cite> — the template documentation will note that no API key is required for endoflife.date but must include rate-limit-aware retry semantics
+- <cite index="10-5">For example, eol: false indicates ongoing support, while eol: "2025-12-31" provides a specific date.</cite> — this informs the Maturity facet documentation's EOL detection rule
+
+**NVD CVE API Research:**
+
+- <cite index="11-13,11-14">Because of this, its APIs enforce offset-based pagination to answer requests for large collections. Through a series of smaller "chunked" responses controlled by an offset startIndex and a page limit resultsPerPage users may page through all the CVE in the NVD.</cite>
+- <cite index="14-27">a rate limit of 50 requests per 30-second window (for requests with API Key; without Key it's only 5 requests)</cite> — this informs the API integrations documentation's required `NVD_API_KEY` provisioning guidance
+- <cite index="15-5">As part of this transition, users will notice that requests being rate limited will now provide a status code of 429 instead of a status code of 403 "Forbidden by Administrative Rules".</cite> — this informs the documented retry-on-429 contract for the CVE scanner
+- <cite index="16-31">The default URL is https://services.nvd.nist.gov.</cite> — base URL for the API integrations documentation
+- <cite index="14-26,14-27">Even though they provide powerful search capabilities, they don't provide multi-CVE (or multi-CPE) requests, which means that many requests must be performed per-CVE/CPE basis. The above, coupled with a rate limit of 50 requests per 30-second window (for requests with API Key; without Key it's only 5 requests), could mean that some users might find this quite limiting.</cite> — this informs the documentation's batched-query strategy guidance
+- <cite index="16-1">The NIST NVD connector uses the Product API v2.0 and Vulnerability API v2.0.</cite> — the template will document NVD CVE API v2.0 as the version of record
+
+**OSV API Research:**
+
+- <cite index="21-3,21-4,21-5">An open, precise, and distributed approach to producing and consuming vulnerability information for open source. All advisories in this database use the OpenSSF OSV format, which was developed in collaboration with open source communities. The OSV schema provides a human and machine readable data format to describe vulnerabilities in a way that precisely maps to open source package versions or commit hashes.</cite>
+- <cite index="21-7,21-8">An easy-to-use API is available to query for all known vulnerabilities by either a commit hash, or a package version. curl -d '{"commit": "6879efc2c1596d11a6a6ad296f80063b558d5e0f"}' "https://api.osv.dev/v1/query"</cite>
+- <cite index="25-9,25-10,25-11,25-12">Currently there are no limits on the API. The API has a response size limit of 32MiB when using HTTP/1.1. There is no limit when using HTTP/2. We recommend using HTTP/2 for queries that may result in large responses</cite> — this informs the CVE scanner documentation's recommended HTTP/2 transport for OSV
+- <cite index="30-6">On average, the GET /v1/vulns/{id} endpoint is 5x faster, POST /v1/query is 2.5x faster, and POST /v1/querybatch is 3x faster.</cite> — this informs the documentation's preference for `POST /v1/querybatch` when scanning many dependencies in a single repository
+
+**SBOM Generation (CycloneDX) Research:**
+
+- <cite index="34-1,34-2">OWASP CycloneDX is a full-stack Bill of Materials (BOM) standard that provides advanced supply chain capabilities for cyber risk reduction. The specification supports Software Bill of Materials (SBOM), Software-as-a-Service Bill of Materials (SaaSBOM), Hardware Bill of Materials (HBOM), Operations Bill of Materials (OBOM), Vulnerability Disclosure Reports (VDR), and Vulnerability Exploitability eXchange (VEX).</cite>
+- <cite index="39-40,39-41">Creates CycloneDX Bill of Materials (BOM) for your projects from source and container images. Supports many languages and package managers.</cite> — `cdxgen` is a single multi-language SBOM generator suitable for the heterogeneous dependency landscape (npm, pip, Maven, Go, Cargo, NuGet, RubyGems, Pipfile)
+- <cite index="22-18">Currently it is able to scan various lockfiles, debian docker containers, SPDX and CycloneDB SBOMs, and git repositories.</cite> — `osv-scanner` natively consumes CycloneDX SBOMs, providing a clean pipeline from `cdxgen` to OSV CVE lookup
+- <cite index="36-3,36-4">CycloneDX tooling is the right choice when you specifically need CycloneDX output and you care about validation, automation, and security-friendly downstream processing. The important detail is that the CycloneDX ecosystem is distributed across language-specific generators and plugins rather than one universal binary for every language.</cite> — this informs the documentation's per-ecosystem SBOM generation strategy
+
+**Documentation Conventions Research:**
+
+- Markdown with embedded Mermaid is the established convention in the WealthLedger tech spec and will be mirrored in the new template package
+- JSON Schema (Draft 2020-12) is the standard contract format for rubric, grade-history, and report-output schemas
+- ISO 8601 is the mandated date format per R3 and R9 and is the universally accepted standard for timestamps in vulnerability and EOL data
+
+## 0.3 Documentation Scope Analysis
+
+### 0.3.1 Capability-to-Documentation Mapping
+
+Because this is a greenfield template package, "code-to-documentation mapping" is reframed as **capability-to-documentation mapping** — for each user-stated capability and rule, this section identifies the specific documentation artifact that operationalizes it.
+
+| Capability or Rule | Documentation Artifact (Target File) | Documentation Content |
+|---|---|---|
+| Template entry point and orchestration | `templates/technology-estate-report/template.md` | The canonical Blitzy-executable prompt, including the role definition, ingestion contract, four-facet execution flow, grading engine invocation, grade-history persistence handoff, PDF rendering invocation, and the verbatim Rules and Validation Gates |
+| Tech Stack Summary facet | `templates/technology-estate-report/docs/facets.md` (§ Tech Stack) | Language detection algorithm (file-extension to language map, % share by file count), cloud provider identification rules (Terraform resource-type prefix mapping, Helm chart annotation parsing, CloudFormation `AWS::*` namespace detection), vendor/framework extraction rules per dependency manifest format |
+| Maturity Summary facet | `templates/technology-estate-report/docs/facets.md` (§ Maturity) | Library-version-to-EOL-status lookup procedure via endoflife.date `/api/v1/products/{product}/` endpoint, vendor version staleness comparison rule, technical debt scoring formula (% of out-of-support dependencies) |
+| Security Summary facet | `templates/technology-estate-report/docs/facets.md` (§ Security) | SBOM generation procedure (CycloneDX via per-ecosystem generators), CVE lookup via NVD `/rest/json/cves/2.0/` and OSV `/v1/querybatch`, severity tier counting rule (CVSS-to-tier table), scan timestamp and database attribution recording |
+| Complexity Summary facet | `templates/technology-estate-report/docs/facets.md` (§ Complexity) | LOC counting rule, file count rule, contributor-count-from-git-history rule, the "Grade: TBD — definition pending" placeholder render contract |
+| Grading engine | `templates/technology-estate-report/docs/grading-engine.md` | Rubric input format, evaluation procedure (per-application, per-facet), letter-grade emission contract, rule R1 verification procedure |
+| Grade history persistence | `templates/technology-estate-report/docs/grade-history.md` | Storage key shape `(application_id, facet, run_date)`, immutability contract, retrieval procedure for prior-run lookup, `N/A` rendering rule for first-run pairs, R10 heterogeneous-scope handling |
+| PDF output contract | `templates/technology-estate-report/docs/pdf-output.md` | Two-section ordering rule (R8), executive summary content list, matrix table column order, cell-rendering format, page break rules |
+| Executive summary aggregation | `templates/technology-estate-report/docs/executive-summary.md` | Total-applications counting, A–F distribution counting per facet, top Critical/High CVE ranking and limit, highest-maturity-risk ranking formula, trend-versus-prior-run net-improvement and net-regression computation |
+| API integrations | `templates/technology-estate-report/docs/api-integrations.md` | GitHub/GitLab API contract, endoflife.date API contract, NVD CVE API v2.0 contract, OSV API v1 contract, rate-limit handling, retry semantics, network-egress allow-list (R6) |
+| Validation harness | `templates/technology-estate-report/docs/validation.md` | Single-command execution path (Gate 10), live smoke test runbook (Gate 1), zero-warning contract (Gate 2), integration sign-off checklist (Gate 8), component-reachability matrix (Gate 9) |
+| Architecture overview | `templates/technology-estate-report/docs/architecture.md` | Component inventory diagram, data-flow diagram from ingestion to PDF, sequence diagram for a single-repository run |
+| Troubleshooting and failure handling | `templates/technology-estate-report/docs/troubleshooting.md` | "Insufficient Data" cell rendering rules, failure-mode-to-cell-value mapping table, common authentication failures, rate-limit recovery |
+| Usage guide | `templates/technology-estate-report/docs/usage.md` | Step-by-step author workflow: provision tokens, author rubric, invoke template, retrieve PDF |
+| Configuration reference | `templates/technology-estate-report/config/facets.yaml` (with companion docs in `docs/configuration.md`) | Documented configuration keys, default values, override procedure |
+| Rubric input schema | `templates/technology-estate-report/schemas/rubric.schema.json` | JSON Schema (Draft 2020-12) for the user-supplied rubric file, with documented examples |
+| Grade history record schema | `templates/technology-estate-report/schemas/grade-history.schema.json` | JSON Schema for the persistence record format, with documented examples |
+| Report output schema | `templates/technology-estate-report/schemas/report-output.schema.json` | JSON Schema for the intermediate report data structure that drives PDF rendering |
+| Top-level package README | `templates/technology-estate-report/README.md` | Package overview, file map, quick-start invocation, links to all documentation pages |
+| Change log | `templates/technology-estate-report/CHANGELOG.md` | Versioned record of template changes |
+
+### 0.3.2 Configuration Options Requiring Documentation
+
+The template package introduces a small set of configuration surfaces that each require explicit documentation:
+
+| Configuration Surface | File | Documented Options |
+|---|---|---|
+| Facet feature flags | `config/facets.yaml` | Enable/disable per facet, "Insufficient Data" thresholds, severity-tier mapping table |
+| Rubric input | `config/rubric-example.yaml` (template); user-supplied at generation time | A–F threshold definitions per facet, with documented examples |
+| Network-egress allow-list | `config/allow-list.yaml` | GitHub/GitLab hosts, endoflife.date host, NVD host, OSV host; documented prohibition of any other outbound host (R6) |
+| Credential references | Documented in `docs/usage.md` | `GITHUB_TOKEN`, `GITLAB_TOKEN`, optional `NVD_API_KEY` — names only, no secret values |
+
+### 0.3.3 Features Requiring User Guides
+
+The following user-facing capabilities each require an end-to-end procedural guide:
+
+- **Template invocation:** Step-by-step procedure for invoking the template from the Blitzy CLI / web UI, including the rubric input handoff, repository scope specification, and PDF retrieval — covered in `docs/usage.md`
+- **Rubric authoring:** Guidance for authoring an A–F rubric per facet, including worked examples ("No library out of support = A for Maturity") — covered in `docs/grading-engine.md` (§ Authoring a Rubric) and `examples/sample-rubric.yaml`
+- **Reading the PDF output:** Guidance for interpreting the executive summary, the inline grade-history format, and the "Insufficient Data" / "N/A" / "Grade: TBD" cell values — covered in `docs/pdf-output.md` (§ Interpreting the Output)
+- **Onboarding a new repository:** Procedure for adding a new repository to a recurring run, including the expectation that the first run will produce `N/A` prior-grade values — covered in `docs/grade-history.md` (§ New Repository Onboarding)
+- **Running the validation harness:** Procedure for running the single-command validation suite (Gate 10) and reviewing each Gate 8 checklist item — covered in `docs/validation.md`
+- **Troubleshooting common failures:** Procedure for diagnosing CVE database lookup failures, manifest parse errors, and rate-limit conditions — covered in `docs/troubleshooting.md`
+
+### 0.3.4 Documentation Gap Analysis
+
+Given the requirements and the fact that this is a greenfield template package, every documentation artifact identified above represents a gap to be filled. There is no prior version to update; there is no partial coverage to extend. The gap inventory is therefore identical to the file transformation inventory in sub-section 0.5.
+
+**Specific Coverage Gaps to Address:**
+
+- **Tech Stack Summary detection rules:** No prior documented detection rule set exists; full algorithm must be authored, including the file-extension-to-language map (cited from established open-source language-detection conventions) and the IaC resource-type-to-cloud-provider map
+- **Maturity Summary EOL lookup rules:** No prior documented procedure exists for mapping a detected library/runtime to an `endoflife.date` product slug; the documentation must include the slug resolution rule and the "endoflife.date does not track this product" fallback to "Insufficient Data"
+- **Security Summary CVE pipeline:** No prior documented pipeline exists for SBOM-to-NVD/OSV CVE counts; the documentation must include the per-ecosystem SBOM generator selection table, the NVD-to-OSV deduplication rule, and the CVSS-to-severity-tier mapping
+- **Complexity Summary placeholder rule:** No prior documented placeholder contract exists; the documentation must include the literal "Grade: TBD — definition pending" string and the prohibition on backfill (R5)
+- **Rubric input format:** No prior schema exists; the JSON Schema must be authored from the requirements, with worked examples
+- **Grade history persistence:** No prior schema exists; the JSON Schema must define the storage record, the unique-key constraint on `(application_id, facet, run_date)`, and the immutability rule for prior-run records
+- **PDF output structure:** No prior PDF specification exists; the documentation must define the executive summary content list, the matrix table column order, the cell-rendering format, and the section-ordering rule (R8)
+- **Validation harness:** No prior validation suite exists; the documentation must define the single-command execution path, the assertions per gate, and the artifact retention policy
+
+## 0.4 Documentation Implementation Design
+
+### 0.4.1 Documentation Structure Planning
+
+The new template package will live in a single self-contained directory under `templates/technology-estate-report/`. The directory layout is designed for discoverability (top-level `README.md` as the entry point), separation of concerns (template body, schemas, configuration, examples, and prose docs each in their own subdirectory), and standalone execution (no relative paths reach outside this directory).
+
+```
+templates/
+└── technology-estate-report/
+    ├── README.md                          (package overview, quick-start, file map)
+    ├── CHANGELOG.md                       (versioned change history)
+    ├── template.md                        (canonical Blitzy prompt template entry point)
+    ├── schemas/
+    │   ├── rubric.schema.json             (JSON Schema for user-supplied rubric)
+    │   ├── grade-history.schema.json      (JSON Schema for persistence record)
+    │   └── report-output.schema.json      (JSON Schema for intermediate report data)
+    ├── config/
+    │   ├── facets.yaml                    (facet feature flags and severity tier map)
+    │   ├── rubric-example.yaml            (worked example rubric per facet)
+    │   └── allow-list.yaml                (network-egress allow-list)
+    ├── examples/
+    │   ├── sample-rubric.yaml             (production-ready example rubric)
+    │   ├── sample-pdf-mockup.md           (Markdown mockup of the rendered PDF)
+    │   └── grade-history-example.json     (sample persistence records)
+    └── docs/
+        ├── usage.md                       (step-by-step author workflow)
+        ├── architecture.md                (component inventory + data flow)
+        ├── facets.md                      (all four facets in one document)
+        ├── grading-engine.md              (rubric format + evaluation procedure)
+        ├── grade-history.md               (persistence semantics + N/A rule)
+        ├── executive-summary.md           (portfolio-level aggregation rules)
+        ├── pdf-output.md                  (PDF section ordering + cell format)
+        ├── api-integrations.md            (GitHub/GitLab + endoflife.date + NVD + OSV)
+        ├── configuration.md               (config file reference)
+        ├── troubleshooting.md             (failure modes + Insufficient Data rules)
+        └── validation.md                  (Gate 1, 2, 8, 9, 10 procedures)
+```
+
+This layout is intentionally flat under `docs/` (no nested subdirectories) to maximize discoverability for CIO/CTO-level reviewers who may navigate via filename alone. Cross-document linking will be done via Markdown relative-path links (`./facets.md#tech-stack-summary`).
+
+### 0.4.2 Content Generation Strategy
+
+**Information Extraction Approach:**
+
+- The template body in `template.md` is authored from the user's prompt verbatim where possible (Rules R1–R10 and Validation Gates 1, 2, 8, 9, 10 are reproduced word-for-word per the "preserve user templates and examples EXACTLY" mandate)
+- The four-facet documentation in `docs/facets.md` is authored from the user-supplied facet table in section 3 of the user's prompt, augmented with the API contracts cited from web research
+- The PDF cell-format specification in `docs/pdf-output.md` is authored from the user-supplied format example `B  ←  prev: C  |  2025-10-01` exactly as stated in the user's prompt
+- The validation harness procedures in `docs/validation.md` are authored from the user-supplied Gate 1, 2, 8, 9, 10 text verbatim
+- The executive summary content list in `docs/executive-summary.md` is authored from the user-supplied "Executive Summary content" bullet list
+
+**Template Application:**
+
+The user provided no external template to follow. Therefore the documentation style follows the established WealthLedger Tech Spec convention: numbered subsections, Markdown prose with embedded Mermaid diagrams, tables for mappings and contracts, and short fenced code blocks for schema fragments and command examples. This style is consistent across all documentation pages in the package.
+
+**Documentation Standards:**
+
+- Markdown formatting with proper Markdown heading depth (`#` for the document title, `##` for major sections, `###` for sub-sections, `####` for sub-sub-sections)
+- Mermaid diagram integration using ` ```mermaid ` fenced blocks
+- JSON Schema fragments using ` ```json ` fenced blocks
+- YAML configuration examples using ` ```yaml ` fenced blocks
+- Shell command examples using ` ```bash ` fenced blocks
+- Source citations as inline annotations (e.g., "per R3 of the Rules section") rather than external footnotes, since this is a self-contained package
+- Tables for parameter descriptions, severity tier maps, cell-rendering matrices, and component-reachability matrices
+- Consistent terminology: **facet** (one of the four matrix columns); **application** (the unit of one repository, identified by `org/repo`); **run** (one invocation of the template producing one PDF); **rubric** (the user-supplied A–F threshold definitions); **grade history** (the persistence layer keyed by `(application_id, facet, run_date)`)
+
+### 0.4.3 Diagram and Visual Strategy
+
+The following Mermaid diagrams will be embedded in the documentation. Each is authored from the user's stated requirements and the integration points discovered during web research.
+
+**Diagram 1 — Component Inventory and Data Flow** (in `docs/architecture.md`):
 
 ```mermaid
-graph TD
-    APP["WealthLedger App"] --> MK["mysql-kit 4.9.0"]
-    APP --> BC["BCryptSwift 2.0.1"]
-    MK --> MN["mysql-nio 1.7.2"]
-    MK --> SK["sql-kit 3.33.0"]
-    MK --> AK["async-kit 1.20.0"]
-    MK --> SC["swift-crypto 3.4.0"]
-    MK --> SN["swift-nio 2.82.0"]
-    MK --> SS["swift-nio-ssl 2.30.0"]
-    MN --> SC
-    MN --> SL["swift-log 1.6.0"]
-    MN --> SN
-    SN --> SA["swift-atomics 1.2.0"]
-    SN --> SCL["swift-collections 1.1.0"]
+graph LR
+    A[Blitzy Ingestion Pipeline<br/>read-only] --> B[Template Entry Point<br/>template.md]
+    B --> C[Tech Stack Detector]
+    B --> D[Maturity Analyzer]
+    B --> E[CVE Scanner]
+    B --> F[Complexity Extractor]
+    C --> G[Grading Engine]
+    D --> G
+    E --> G
+    F --> G
+    G --> H[Grade Persistence Store]
+    H --> I[PDF Renderer]
+    I --> J[Output PDF]
+    K[User-Supplied Rubric] --> G
+    L[endoflife.date API] --> D
+    M[NVD CVE API v2.0] --> E
+    N[OSV API v1] --> E
 ```
 
-**Package.swift Direct Dependencies (only these two are declared; transitives are resolved automatically):**
-
-```swift
-.package(url: "https://github.com/vapor/mysql-kit.git", from: "4.9.0"),
-.package(url: "https://github.com/wisetail/BCryptSwift.git", from: "2.0.1"),
-```
-
-### 0.3.2 Dependency Updates
-
-Since this is a greenfield project with no existing dependency manifests, there are no dependency updates to perform. All dependencies will be declared fresh in the new `Package.swift`.
-
-**Import Patterns to Establish:**
-
-All source files will use explicit, module-scoped imports. The following import patterns will be established across the codebase:
-
-- **Persistence layer files** (`Sources/Persistence/**/*.swift`):
-  - `import MySQLKit` — database connection, query execution
-  - `import MySQLNIO` — low-level MySQL types (MySQLData, MySQLRow)
-  - `import SQLKit` — SQL query builder (SQLDatabase, SQLRaw)
-  - `import AsyncKit` — connection pool management
-  - `import NIOCore` — EventLoopFuture, EventLoopGroup
-  - `import Logging` — structured logging
-
-- **RBAC authentication files** (`Sources/RBAC/Services/PasswordHasher.swift`):
-  - `import BCryptSwift` — bcrypt hash generation and verification
-
-- **UI layer files** (`Sources/UILayer/**/*.swift`):
-  - `import SwiftUI` — all view definitions
-  - No direct MySQLKit imports — views interact with services only
-
-- **Model files** (`Sources/*/Models/*.swift`):
-  - `import Foundation` — Date, Decimal, UUID, TimeZone
-  - No external dependency imports in model files
-
-- **Shared utilities** (`Sources/Shared/**/*.swift`):
-  - `import Foundation` — Date, TimeZone, Decimal extensions
-
-**External Reference Configuration:**
-
-| File | Configuration Purpose |
-|------|----------------------|
-| `Package.swift` | SPM dependency declarations, target definitions, platform requirements (`.macOS(.v15)` minimum) |
-| `Scripts/setup_database.sh` | MySQL 8.0 installation via Homebrew, schema creation, user setup |
-| `Resources/Migrations/*.sql` | DDL scripts for MySQL 8.0 schema |
-| `README.md` | Build instructions, dependency installation guide, database setup |
-| `Docs/architecture.md` | Dependency rationale and version selection documentation |
-
-
-## 0.4 Integration Analysis
-
-
-### 0.4.1 Existing Code Touchpoints
-
-Since this is a greenfield project, there are no existing code touchpoints to modify. All integration points are new constructions. The analysis below documents how the six application modules interconnect with each other, the persistence layer, and the UI layer.
-
-**Module Integration Map:**
+**Diagram 2 — Single-Repository Run Sequence** (in `docs/architecture.md`):
 
 ```mermaid
-graph TD
-    subgraph UILayer["UI Layer (SwiftUI)"]
-        AV["AdminView"]
-        SV["SearchView"]
-        AVV["AccountsViewerView"]
-        JSV["JobSchedulerView"]
-    end
-
-    subgraph Modules["Business Logic Modules"]
-        AM["AccountManagement"]
-        LE["LedgerEngine"]
-        VE["ValuationEngine"]
-        RDS["ReferenceDataService"]
-        JS["JobScheduler"]
-        RBAC["RBAC"]
-    end
-
-    subgraph Persistence["Persistence Layer"]
-        DM["DatabaseManager"]
-        CP["ConnectionPool"]
-        REPOS["Repositories"]
-        MIG["MigrationManager"]
-    end
-
-    DB[("MySQL 8.0")]
-
-    AV --> RBAC
-    AV --> AM
-    SV --> AM
-    SV --> RBAC
-    AVV --> AM
-    AVV --> VE
-    AVV --> LE
-    AVV --> RBAC
-    JSV --> JS
-    JSV --> RBAC
-
-    AM --> REPOS
-    LE --> REPOS
-    VE --> REPOS
-    VE --> RDS
-    RDS --> REPOS
-    JS --> VE
-    JS --> RDS
-    JS --> AM
-    RBAC --> REPOS
-
-    REPOS --> CP
-    CP --> DM
-    DM --> DB
-    MIG --> DM
+sequenceDiagram
+    participant U as Report Author
+    participant T as Template Entry Point
+    participant I as Ingestion Pipeline
+    participant F as Facet Analyzers
+    participant G as Grading Engine
+    participant H as Grade History Store
+    participant P as PDF Renderer
+    U->>T: Invoke with rubric + repo scope
+    T->>I: Read repository artifacts
+    I-->>T: Source files, manifests, IaC, SaaS manifests
+    T->>F: Run tech stack, maturity, security, complexity
+    F-->>T: Per-facet raw data + scan timestamps
+    T->>G: Apply rubric per facet
+    G-->>T: A-F letter grade per facet
+    T->>H: Read prior grade for org/repo
+    H-->>T: Prior grade + ISO date OR N/A
+    T->>H: Persist current run grade
+    T->>P: Render PDF with executive summary + matrix
+    P-->>U: Deliver PDF artifact
 ```
 
-**Cross-Module Integration Points:**
-
-- **`@main` Entry Point → All Modules (WealthLedgerApp.swift)**
-  - The `@main` entry point initializes `DatabaseManager` with MySQLKit configuration
-  - `DependencyContainer` registers all services: `AccountService`, `LedgerService`, `ValuationService`, `ReferenceDataService`, `JobSchedulerService`, `AuthenticationService`, `EntitlementService`
-  - `MainNavigationView` provides navigation to all four screens
-  - Gate 9 requires every module to be reachable from `@main`
-
-- **AdminView → RBAC + AccountManagement**
-  - `AdminView` calls `AuthenticationService.createUser()` for user creation with bcrypt-hashed passwords
-  - `AdminView` calls `AccountGroupService.createGroup()` for account group creation
-  - `AdminView` calls `EntitlementService.assignEntitlement()` to set READ/CREATE/MODIFY/DELETE per user-group pair
-  - All operations require the current user to have admin-level access
-
-- **SearchView → AccountManagement + RBAC**
-  - `SearchView` calls `AccountService.search()` with filters (name partial match, ID exact, type, group)
-  - `AccountService.search()` internally calls `EntitlementService.filterAccessibleGroups()` to restrict results to entitled account groups
-  - Results capped at 1,000 accounts; users without READ access to a group receive zero records for that group
-
-- **AccountsViewerView → AccountManagement + ValuationEngine + LedgerEngine + RBAC**
-  - `AccountsViewerView` receives selected accounts from `SearchView`
-  - Displays account name, ID, cached valuation amount, positions (instrument + quantity), and value date
-  - `ValuationEngine` provides per-account value and value date computation
-  - `LedgerEngine` provides transaction history and position data
-  - Entitlement checks applied before any data is displayed
-
-- **JobSchedulerView → JobScheduler + ReferenceDataService + ValuationEngine + AccountManagement**
-  - `JobSchedulerView` calls `JobSchedulerService.createJob()` for report and ingestion jobs
-  - Report jobs invoke `ReportGenerator` which queries `AccountService` and `ValuationService` for data, then exports via `CSVExporter`
-  - Ingestion jobs invoke `CSVParser` to parse CSV files and `ReferenceDataService` to insert records
-  - All jobs are manually triggered — no cron automation
-
-- **ValuationEngine → ReferenceDataService + AccountManagement + Persistence**
-  - `ValuationService.runValuation()` loads account positions via `PositionRepository`
-  - Retrieves EOD prices from `ReferenceDataRepository` for each instrument
-  - `NAVCalculator` computes `Σ(quantity × EOD midpoint) + cash_balance`
-  - Writes cached valuation amount and value date back to `AccountRepository` atomically in the same DB transaction
-  - Uses account's stored IANA timezone (not system clock) for value date computation
-
-- **LedgerEngine → AccountManagement + Persistence**
-  - `LedgerService.postTransaction()` validates balanced debit/credit pairs via `DoubleEntryValidator`
-  - Validates asset class is equities only before any DB write
-  - Creates position records via `PositionRepository` when new holdings are established
-  - Restatements create offsetting entries referencing the original transaction ID via FK
-
-- **RBAC → Persistence (Cross-cutting concern)**
-  - `EntitlementService` is called by `AccountService`, `LedgerService`, and all UI screens
-  - Queries `EntitlementRepository` to verify READ/CREATE/MODIFY/DELETE permissions per user-group pair
-  - Returns empty result sets (not errors) for unauthorized access attempts
-
-**Database/Schema Integration:**
-
-- **Migration execution**: `MigrationManager` runs SQL files in `Resources/Migrations/` in numerical order against the MySQL instance
-- **Schema creation for tests**: Integration tests create a dedicated `accounting_test` schema and drop it after completion (Gate 10)
-- **FK constraint enforcement**: All inter-table relationships enforced via MySQL foreign key constraints (Rule 15)
-- **Atomic valuation cache**: `ValuationService` updates `accounts.cached_valuation_amount` and `accounts.cached_value_date` within the same MySQL transaction as the valuation write (Rule 16)
-
-**Dependency Injection Wiring (`DependencyContainer.swift`):**
-
-| Service | Dependencies Injected |
-|---------|----------------------|
-| `AccountService` | `AccountRepository`, `EntitlementService` |
-| `AccountGroupService` | `AccountGroupRepository` |
-| `LedgerService` | `TransactionRepository`, `PositionRepository`, `DoubleEntryValidator`, `EntitlementService` |
-| `ValuationService` | `AccountRepository`, `PositionRepository`, `ReferenceDataRepository`, `NAVCalculator` |
-| `ReferenceDataService` | `ReferenceDataRepository`, `CSVParser` |
-| `JobSchedulerService` | `ReportGenerator`, `CSVParser`, `ReferenceDataService`, `AccountService`, `ValuationService` |
-| `AuthenticationService` | `UserRepository`, `PasswordHasher` |
-| `EntitlementService` | `EntitlementRepository` |
-| All Repositories | `ConnectionPool` (via `DatabaseManager`) |
-
-
-## 0.5 Technical Implementation
-
-
-### 0.5.1 File-by-File Execution Plan
-
-Every file listed below must be created. Files are organized into execution groups reflecting dependency order — each group builds on the foundation established by preceding groups.
-
-**Group 1 — Project Foundation and Build Configuration:**
-
-- CREATE: `Package.swift` — Define SPM package with targets: `WealthLedgerApp` (executable), `SeedTool` (executable), `AccountManagement`, `LedgerEngine`, `ValuationEngine`, `ReferenceDataService`, `JobScheduler`, `RBAC`, `UILayer`, `Persistence`, `Shared` (libraries), plus `UnitTests` and `IntegrationTests` (test targets). Declare dependencies on `mysql-kit` 4.9.0 and `BCryptSwift` 2.0.1. Set platform to `.macOS(.v15)`.
-- CREATE: `.gitignore` — Ignore `.build/`, `DerivedData/`, `.DS_Store`, `*.xcuserstate`, `Package.resolved` (optional)
-- CREATE: `.swiftlint.yml` — Enforce Swift coding conventions consistent with Swift 6 strict concurrency
-- MODIFY: `README.md` — Replace `# MikeRepo` with comprehensive project documentation: architecture overview, build prerequisites (Xcode 26.4, MySQL 8.0 via Homebrew), setup instructions, module descriptions, test execution command
-
-**Group 2 — Database Schema and Migration Infrastructure:**
-
-- CREATE: `Resources/Migrations/001_create_users.sql` — `CREATE TABLE users (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, username VARCHAR(255) UNIQUE NOT NULL, password_hash VARCHAR(255) NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);`
-- CREATE: `Resources/Migrations/002_create_account_groups.sql` — `CREATE TABLE account_groups (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, group_name VARCHAR(255) NOT NULL, metadata JSON, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);`
-- CREATE: `Resources/Migrations/003_create_entitlements.sql` — Entitlements table with FKs to `users` and `account_groups`, permission flags (can_read, can_create, can_modify, can_delete) as BOOLEAN columns
-- CREATE: `Resources/Migrations/004_create_accounts.sql` — Accounts table with fund_type, ownership_details, valuation_timezone (VARCHAR for IANA string), valuation_schedule, cached_valuation_amount (DECIMAL(20,6)), cached_value_date (DATE), account_status ENUM, FK to account_groups
-- CREATE: `Resources/Migrations/005_create_reference_data.sql` — Reference data table with ticker, name, sod_bid, sod_ask, eod_bid, eod_ask (all DECIMAL(20,6) NOT NULL), market_date
-- CREATE: `Resources/Migrations/006_create_positions.sql` — Positions table with FKs to accounts and reference_data, quantity DECIMAL, asset_type ENUM restricted to equities
-- CREATE: `Resources/Migrations/007_create_transactions.sql` — Transactions table: immutable (no UPDATE/DELETE at app layer), instrument FK, quantity, asset_type, ownership_pct, debit_amount, credit_amount, restatement_ref_id FK to self, FK to accounts
-- CREATE: `Resources/Migrations/008_create_indexes.sql` — Composite indexes: `idx_accounts_name` (account_name), `idx_accounts_type` (account_type), `idx_accounts_group` (account_group_id), `idx_positions_account` (account_id), `idx_transactions_account` (account_id), `idx_reference_data_ticker` (ticker), `idx_reference_data_date` (market_date)
-- CREATE: `Scripts/setup_database.sh` — Script to: install MySQL 8.0 via Homebrew, start MySQL service, create database `wealth_ledger`, create application user, run all migration scripts in order
-
-**Group 3 — Shared Module and Persistence Layer:**
-
-- CREATE: `Sources/Shared/Constants.swift` — Define `BATCH_SIZE = 1000`, `MAX_SEARCH_RESULTS = 1000`, `CASH_PRICE = Decimal(1.0)`, `DEFAULT_PAGINATION = 1000`
-- CREATE: `Sources/Shared/Errors/AppError.swift` — Define error types: `unbalancedEntry`, `unauthorizedAccess`, `invalidAssetClass`, `accountNotFound`, `duplicateUser`, `invalidTimezone`, `migrationFailed`
-- CREATE: `Sources/Shared/Extensions/Date+Timezone.swift` — Implement `valueDateForTimezone(_ iana: String) -> Date` that computes the value date using the account's stored timezone exclusively
-- CREATE: `Sources/Shared/Extensions/Decimal+Currency.swift` — Implement `midpoint(bid: Decimal, ask: Decimal) -> Decimal` returning `(bid + ask) / 2`
-- CREATE: `Sources/Shared/Protocols/RepositoryProtocol.swift` — Define generic `Repository` protocol with `findById`, `findAll`, `create`, `delete` methods
-- CREATE: `Sources/Persistence/DatabaseManager.swift` — Initialize MySQLKit with `MySQLConfiguration(hostname: "localhost", port: 3306, username:, password:, database: "wealth_ledger")`; manage EventLoopGroup lifecycle
-- CREATE: `Sources/Persistence/ConnectionPool.swift` — Configure `EventLoopGroupConnectionPool` with AsyncKit; expose `withConnection` method for transactional operations
-- CREATE: `Sources/Persistence/MigrationManager.swift` — Read SQL files from `Resources/Migrations/` directory, execute in numerical order, track applied migrations
-- CREATE: `Sources/Persistence/Repositories/AccountRepository.swift` — Implement search with partial name match (`LIKE ?`), exact ID, type filter, group filter; pagination; batch status update; cached valuation atomic update
-- CREATE: `Sources/Persistence/Repositories/TransactionRepository.swift` — Append-only inserts; offsetting entry creation with restatement FK; no UPDATE/DELETE methods
-- CREATE: `Sources/Persistence/Repositories/PositionRepository.swift` — CRUD with FK enforcement to accounts and reference_data; asset type validation (equities only)
-- CREATE: `Sources/Persistence/Repositories/UserRepository.swift` — User creation with password hash; lookup by username
-- CREATE: `Sources/Persistence/Repositories/EntitlementRepository.swift` — Permission queries by user_id + account_group_id; CRUD for entitlement assignments
-- CREATE: `Sources/Persistence/Repositories/AccountGroupRepository.swift` — Account group CRUD
-- CREATE: `Sources/Persistence/Repositories/ReferenceDataRepository.swift` — Bulk insert for CSV ingestion; EOD price lookups by ticker and market_date
-
-**Group 4 — Core Business Logic Modules:**
-
-- CREATE: `Sources/RBAC/Models/User.swift` — User struct with id, username, passwordHash; Sendable conformance
-- CREATE: `Sources/RBAC/Models/Entitlement.swift` — Entitlement struct with userId, accountGroupId, canRead/canCreate/canModify/canDelete; Sendable conformance
-- CREATE: `Sources/RBAC/Services/PasswordHasher.swift` — Wrapper around BCryptSwift: `hash(_ password: String) -> String` and `verify(_ password: String, against hash: String) -> Bool`
-- CREATE: `Sources/RBAC/Services/AuthenticationService.swift` — `login(username:password:)` validates credentials against bcrypt hash; `createUser(username:password:)` stores new user with hashed password
-- CREATE: `Sources/RBAC/Services/EntitlementService.swift` — `checkPermission(userId:accountGroupId:permission:) -> Bool`; `filterAccessibleGroups(userId:) -> [AccountGroup]`; returns empty results for unauthorized access
-- CREATE: `Sources/AccountManagement/Models/Account.swift` — Account struct with all fields including IANA timezone, cached valuation, status; Sendable conformance
-- CREATE: `Sources/AccountManagement/Models/AccountGroup.swift` — AccountGroup struct; Sendable conformance
-- CREATE: `Sources/AccountManagement/Models/AccountStatus.swift` — Enum: `.active`, `.inactive`, `.pending`, `.suspended`
-- CREATE: `Sources/AccountManagement/Models/FundType.swift` — Enum with cases for institutional (openMutualFund, closedMutualFund, etf, hedgeFund) and wealth (sma, uma) categories
-- CREATE: `Sources/AccountManagement/Services/AccountService.swift` — Search (name/ID/type/group), CRUD, batch status update (up to 1,000); all operations enforce entitlement checks
-- CREATE: `Sources/AccountManagement/Services/AccountGroupService.swift` — Account group CRUD operations
-- CREATE: `Sources/LedgerEngine/Models/Transaction.swift` — Immutable transaction struct; Sendable conformance
-- CREATE: `Sources/LedgerEngine/Models/Position.swift` — Position struct with account FK, instrument FK, quantity, asset type
-- CREATE: `Sources/LedgerEngine/Services/DoubleEntryValidator.swift` — `validate(debits: [Decimal], credits: [Decimal]) throws` — rejects if sum != 0
-- CREATE: `Sources/LedgerEngine/Services/LedgerService.swift` — `postTransaction()` with double-entry validation and asset class guard; `createRestatement()` with offsetting entry referencing original
-- CREATE: `Sources/ValuationEngine/Models/Valuation.swift` — Valuation result struct: accountId, valueAmount, valueDate, timezone, positions
-- CREATE: `Sources/ValuationEngine/Services/NAVCalculator.swift` — Pure calculation: iterates positions, computes midpoint per instrument, sums `qty × midpoint`, adds cash balance
-- CREATE: `Sources/ValuationEngine/Services/ValuationService.swift` — Orchestrates batch valuation with pagination (1,000 per batch); uses account timezone for value date; writes cached result atomically
-- CREATE: `Sources/ReferenceDataService/Models/ReferenceData.swift` — ReferenceData struct with all six price fields
-- CREATE: `Sources/ReferenceDataService/Services/ReferenceDataService.swift` — Query by ticker, market date; manage reference data lifecycle
-- CREATE: `Sources/ReferenceDataService/Services/CSVParser.swift` — Parse CSV by filename/type/directory; validate columns; paginated ingestion for large files (up to 100MB)
-- CREATE: `Sources/ReferenceDataService/Services/CSVExporter.swift` — Export to CSV with configurable field selection
-- CREATE: `Sources/ReferenceDataService/Generators/SyntheticDataGenerator.swift` — Generate 500+ synthetic NYSE equities with realistic tickers (3-5 uppercase letters), names, and six non-null non-zero price fields
-- CREATE: `Sources/JobScheduler/Models/Job.swift` — Job struct: type (report/ingestion), status (pending/running/completed/failed), parameters
-- CREATE: `Sources/JobScheduler/Services/JobSchedulerService.swift` — Job CRUD, manual trigger execution, status tracking
-- CREATE: `Sources/JobScheduler/Services/ReportGenerator.swift` — Build CSV reports with field selection, account filtering, target date
-
-**Group 5 — UI Layer:**
-
-- CREATE: `Sources/UILayer/Navigation/MainNavigationView.swift` — Root navigation with sidebar or tab layout routing to Admin, Search, Accounts Viewer, Job Scheduler; gate behind authentication
-- CREATE: `Sources/UILayer/AdminScreen/AdminView.swift` — Three sections: user creation form, account group creation form, entitlement assignment grid (user × group × RCMD permissions)
-- CREATE: `Sources/UILayer/SearchScreen/SearchView.swift` — Search fields (name, ID, type dropdown, group dropdown), results list capped at 1,000, multi-select for accounts, "View Selected" button navigating to Accounts Viewer
-- CREATE: `Sources/UILayer/AccountsViewer/AccountsViewerView.swift` — `LazyVStack` scrollable list: account name, ID, value, positions (instrument + quantity), value date; 30fps scrolling target; initial render under 1 second for 1,000 accounts
-- CREATE: `Sources/UILayer/JobSchedulerScreen/JobSchedulerView.swift` — Job creation form (report type, field selection, account selection, target date, CSV file picker for ingestion), job list with status, manual trigger buttons
-- CREATE: `Sources/UILayer/Components/AccountRowView.swift` — Reusable row: account name, ID, formatted value amount, status badge
-- CREATE: `Sources/UILayer/Components/PositionDetailView.swift` — Expandable position list per account: instrument ticker, quantity, current midpoint value
-- CREATE: `Sources/UILayer/Components/EntitlementFormView.swift` — Permission toggle form: READ/CREATE/MODIFY/DELETE checkboxes per user-group pair
-
-**Group 6 — Application Entry Point and Dependency Wiring:**
-
-- CREATE: `Sources/WealthLedgerApp/WealthLedgerApp.swift` — `@main` struct conforming to `App`; initializes `DatabaseManager`, `DependencyContainer`; presents `MainNavigationView` as the root scene
-- CREATE: `Sources/WealthLedgerApp/AppState.swift` — `@Observable` class: currentUser, selectedAccounts, navigationPath; drives reactive UI updates
-- CREATE: `Sources/WealthLedgerApp/DependencyContainer.swift` — Service locator pattern; registers all services from all modules; injectable into SwiftUI environment
-
-**Group 7 — CLI Seed Tool:**
-
-- CREATE: `Sources/SeedTool/SeedToolMain.swift` — `@main` CLI entry point: connects to MySQL, generates synthetic NYSE CSV via `SyntheticDataGenerator`, inserts 500+ rows into `reference_data`, optionally seeds sample accounts and users
-
-**Group 8 — Tests:**
-
-- CREATE: `Tests/UnitTests/LedgerEngineTests/DoubleEntryValidatorTests.swift` — Test balanced/unbalanced entry rejection
-- CREATE: `Tests/UnitTests/LedgerEngineTests/LedgerServiceTests.swift` — Test transaction posting, restatement creation
-- CREATE: `Tests/UnitTests/ValuationEngineTests/NAVCalculatorTests.swift` — Test NAV formula with known inputs against hand-calculated expected values
-- CREATE: `Tests/UnitTests/ValuationEngineTests/ValuationServiceTests.swift` — Test timezone-aware value date computation (US/Eastern vs Europe/London)
-- CREATE: `Tests/UnitTests/RBACTests/AuthenticationTests.swift` — Test bcrypt hash/verify round-trip
-- CREATE: `Tests/UnitTests/RBACTests/EntitlementTests.swift` — Test permission flag checks, empty result for unauthorized
-- CREATE: `Tests/UnitTests/AccountManagementTests/AccountServiceTests.swift` — Test search filtering, batch status update logic, fund type validation
-- CREATE: `Tests/UnitTests/ReferenceDataTests/CSVParserTests.swift` — Test CSV column validation, row parsing
-- CREATE: `Tests/IntegrationTests/TestDatabaseSetup.swift` — Create `accounting_test` schema, run all migrations, teardown; shared by all integration tests
-- CREATE: `Tests/IntegrationTests/EndToEndWorkflowTests.swift` — Gate 1: create account → post buy transaction → run valuation → verify account value in viewer
-- CREATE: `Tests/IntegrationTests/AccountManagementIntegrationTests.swift` — Account CRUD, search, batch update against live MySQL
-- CREATE: `Tests/IntegrationTests/LedgerIntegrationTests.swift` — Transaction posting, restatement, double-entry enforcement against live MySQL
-- CREATE: `Tests/IntegrationTests/ValuationIntegrationTests.swift` — Valuation with timezone verification (US/Eastern vs Europe/London distinct value dates)
-- CREATE: `Tests/IntegrationTests/RBACIntegrationTests.swift` — Entitlement enforcement: user without READ access receives zero records
-- CREATE: `Tests/IntegrationTests/ReferenceDataIntegrationTests.swift` — CSV ingestion, 500+ row seed verification against live MySQL
-- CREATE: `Tests/IntegrationTests/JobSchedulerIntegrationTests.swift` — Job creation and execution against live MySQL
-
-**Group 9 — Documentation:**
-
-- CREATE: `Docs/architecture.md` — Module diagram, dependency graph, data flow descriptions
-- CREATE: `Docs/database_schema.md` — Complete ERD, table definitions, FK map, index strategy
-- CREATE: `Docs/user_guide.md` — Screen-by-screen user guide for all four UI screens
-
-### 0.5.2 Implementation Approach per File
-
-The implementation follows a bottom-up construction order to ensure each layer has its foundation in place before dependent layers are built:
-
-- **Establish persistence foundation** by creating the MySQL schema via migration scripts, then implementing `DatabaseManager` and `ConnectionPool` with MySQLKit configuration, followed by all seven repository classes that provide typed CRUD access to each table
-
-- **Build core business logic modules** by implementing model structs (all conforming to `Sendable` for Swift 6 strict concurrency), then service classes that compose repository calls with business rules — specifically the `DoubleEntryValidator` for balanced entries, `NAVCalculator` for valuation formula, `EntitlementService` for permission enforcement, and `PasswordHasher` for bcrypt operations
-
-- **Wire cross-module integrations** by implementing `AccountService` (which internally calls `EntitlementService` for every query), `LedgerService` (which calls `DoubleEntryValidator` before every write), `ValuationService` (which calls `NAVCalculator` and writes cached results atomically), and `JobSchedulerService` (which orchestrates `ReportGenerator` and `CSVParser`)
-
-- **Construct the UI layer** by creating SwiftUI views that consume services through the `DependencyContainer` injected via SwiftUI environment — using `LazyVStack` for performant scrolling, `@Observable` for reactive state, and `async/await` for non-blocking database operations
-
-- **Complete the entry point** by wiring `WealthLedgerApp.swift` as the `@main` struct that initializes all infrastructure and presents `MainNavigationView`
-
-- **Ensure quality** by implementing unit tests for pure business logic (validators, calculators, permission checks) and integration tests that exercise the full call chain against a live MySQL `accounting_test` schema
-
-For files that require Figma URL references: **no Figma URLs or design assets were specified** for this project. The UI is defined by functional requirements in the user prompt.
-
-### 0.5.3 User Interface Design
-
-The application has exactly four screens as specified in the requirements:
-
-**Admin Screen** — Provides three administrative functions: user creation (username + password form with bcrypt hashing on submit), account group creation (group name + metadata form), and entitlement assignment (grid or form selecting a user, an account group, and toggling READ/CREATE/MODIFY/DELETE flags). Admin access is gated behind RBAC verification.
-
-**Search Screen** — Offers four search fields: account name (partial match via text input), account ID (exact match via text input), account type (dropdown: mutual fund, ETF, hedge fund, SMA, UMA), and account group (dropdown populated from entitled groups). Search results display in a scrollable list capped at 1,000 records. Users can select multiple accounts (up to 1,000) and navigate to Accounts Viewer with the selection.
-
-**Accounts Viewer Screen** — Displays selected accounts in a `LazyVStack` for 30fps scrolling. Each row shows account name, account ID, cached valuation amount, and value date. Expanding a row reveals position details (instrument ticker, quantity, per-position midpoint value). Initial render of 1,000 accounts targets under 1 second. All displayed data respects entitlement enforcement — zero data shown for groups without READ permission.
-
-**Job Scheduler Screen** — Provides a job creation form with two modes: report generation (field selection checkboxes, account selection from search, target date picker, trigger button producing CSV export) and CSV ingestion (file picker for local CSV, type selection, trigger button). A job list shows pending/running/completed/failed jobs. All triggers are manual — no automated scheduling.
-
-
-## 0.6 Scope Boundaries
-
-
-### 0.6.1 Exhaustively In Scope
-
-**All feature source files:**
-- `Sources/WealthLedgerApp/**/*.swift` — Main application entry point, app state, dependency container
-- `Sources/AccountManagement/**/*.swift` — Account models, services, group management
-- `Sources/LedgerEngine/**/*.swift` — Transaction model, position model, ledger service, double-entry validator
-- `Sources/ValuationEngine/**/*.swift` — Valuation model, NAV calculator, valuation service with timezone handling
-- `Sources/ReferenceDataService/**/*.swift` — Reference data model, CSV parser/exporter, synthetic data generator, reference data service
-- `Sources/JobScheduler/**/*.swift` — Job model, scheduler service, report generator
-- `Sources/RBAC/**/*.swift` — User model, entitlement model, authentication service, entitlement service, password hasher
-- `Sources/UILayer/**/*.swift` — All four screens (Admin, Search, Accounts Viewer, Job Scheduler), navigation, reusable components
-- `Sources/Persistence/**/*.swift` — Database manager, connection pool, migration manager, all seven repository classes
-- `Sources/Shared/**/*.swift` — Extensions (Date+Timezone, Decimal+Currency), protocols, constants, error types
-- `Sources/SeedTool/**/*.swift` — CLI seed tool for synthetic data generation
-
-**All test files:**
-- `Tests/UnitTests/**/*.swift` — Unit tests for DoubleEntryValidator, LedgerService, NAVCalculator, ValuationService, Authentication, Entitlements, AccountService, CSVParser
-- `Tests/IntegrationTests/**/*.swift` — Integration tests for all six modules against live MySQL, end-to-end workflow test, test database setup/teardown
-
-**Database schema and migrations:**
-- `Resources/Migrations/001_create_users.sql`
-- `Resources/Migrations/002_create_account_groups.sql`
-- `Resources/Migrations/003_create_entitlements.sql`
-- `Resources/Migrations/004_create_accounts.sql`
-- `Resources/Migrations/005_create_reference_data.sql`
-- `Resources/Migrations/006_create_positions.sql`
-- `Resources/Migrations/007_create_transactions.sql`
-- `Resources/Migrations/008_create_indexes.sql`
-
-**Configuration files:**
-- `Package.swift` — SPM manifest with all targets and dependencies
-- `.gitignore` — Git ignore rules
-- `.swiftlint.yml` — Linting configuration
-- `.swift-format` — Formatting configuration
-
-**Documentation:**
-- `README.md` — Project overview, build instructions, database setup, module descriptions
-- `Docs/architecture.md` — Architecture diagram, module dependencies, data flow
-- `Docs/database_schema.md` — ERD, table definitions, FK map, index strategy
-- `Docs/user_guide.md` — Screen-by-screen user guide
-
-**Scripts:**
-- `Scripts/setup_database.sh` — MySQL installation, schema creation, migration execution
-
-**Validation gates (all must pass):**
-- Gate 1: End-to-end boundary verification against live MySQL 8.0
-- Gate 2: Zero-warning Xcode build with Swift 6 strict concurrency
-- Gate 8: Integration sign-off checklist (live smoke test, entitlement contract, valuation correctness, batch performance)
-- Gate 9: Integration wiring verification for all six modules (reachable from `@main`, exercised via integration tests)
-- Gate 10: Test execution via single `xcodebuild test` command with `accounting_test` schema
-
-**Performance targets:**
-- Full-universe account search (100,000 accounts): under 2 seconds
-- Batch valuation (1,000 accounts): under 30 seconds
-- Accounts Viewer initial render (1,000 accounts): under 1 second
-- Accounts Viewer scrolling: 30fps or above
-- CSV ingestion (up to 100MB): no crash, runs to completion
-- MySQL RAM footprint: under 4GB
-
-### 0.6.2 Explicitly Out of Scope
-
-The following items are explicitly excluded from this implementation and must not be built:
-
-- **Fixed income, derivatives, digital assets** — Only equities are supported. The asset class guard rejects any non-equity instrument at the application layer.
-- **Multi-currency** — All values are in a single currency. No currency conversion or multi-currency accounting.
-- **Multi-tenancy** — Single-tenant application with one local MySQL database per installation.
-- **Audit logging** — No tracking of who changed what and when. Transaction immutability provides a partial audit trail, but formal audit logging is not implemented.
-- **External API surface** — No REST API, GraphQL, or any external-facing API. The application is a standalone desktop app.
-- **Event-driven or async messaging architecture** — No message queues, event buses, or pub/sub patterns. All operations are synchronous request-response via MySQLKit.
-- **Real or live market data feeds** — All reference data is simulated. No connections to Bloomberg, Reuters, NYSE, or any external data provider.
-- **Any network calls at runtime** — The application must function with network adapter disabled. Zero external HTTP/HTTPS calls.
-- **Automated cron scheduling** — All jobs are manually triggered. No background schedulers, timers, or cron expressions.
-- **Multi-entity consolidation** — No cross-entity or cross-account-group aggregation beyond what is shown in Accounts Viewer.
-- **Report formats other than CSV** — No PDF, Excel, HTML, or JSON report exports.
-- **SwiftData** — Explicitly forbidden. `grep -r "import SwiftData"` must return zero results.
-- **Docker or cloud services** — No containerization, no cloud deployment, no CI/CD pipelines. Single-machine Xcode build only.
-- **OAuth, SSO, token expiry** — Local authentication only via username + bcrypt password stored in MySQL. No external identity providers.
-- **Performance optimizations beyond stated thresholds** — No over-engineering for scenarios beyond the 100,000 account / 1 concurrent user specification.
-- **Refactoring of existing code** — Greenfield project; there is no existing code to refactor.
-- **Multi-user concurrency** — System designed for 1 concurrent user at launch. No optimistic locking, no row-level conflict resolution.
-
-
-## 0.7 Rules for Feature Addition
-
-
-The user has specified the following rules that must be strictly enforced throughout all implementation work. Each rule includes its scope and verification criteria as defined in the requirements.
-
-**Rule 1 — Double-Entry Enforcement**
-Every ledger write must produce balanced debit/credit pairs summing to zero. Unbalanced entries must be rejected at the application layer before any DB write. Scope: all writes to the `transactions` table. Verification: attempting to post an unbalanced entry returns an application-layer error; no unbalanced rows exist in `transactions`.
-
-**Rule 2 — Transaction Immutability**
-The `transactions` table must not be targeted by UPDATE or DELETE statements in application code. Corrections must use offsetting entries that reference the original transaction ID via FK. Scope: `transactions` table exclusively. Verification: `grep -r "UPDATE transactions|DELETE.*transactions"` across the project returns zero results.
-
-**Rule 3 — Per-Account Valuation Timezone**
-Each account must store its own IANA timezone string and valuation schedule. `ValuationEngine` must use the account's stored timezone; system clock timezone must not be used. Scope: `ValuationEngine` module. Verification: two accounts configured for US/Eastern and Europe/London produce distinct value dates for the same calendar day.
-
-**Rule 4 — Entitlement Enforcement**
-All data reads must verify user-group entitlement before returning records. Users without READ access to an account group must receive an empty result set — not an error, not a partial result. Scope: all query paths in `AccountManagement`, `LedgerEngine`, and Accounts Viewer. Verification: authenticated user without entitlement queries an account group and receives zero records.
-
-**Rule 5 — Asset Class Guard**
-The application must reject creation of any position or transaction for a non-equity instrument at the application layer. Scope: position and transaction creation paths. Verification: attempt to create a fixed-income position returns a rejection error with zero DB writes.
-
-**Rule 6 — Reference Data Simulation Fidelity**
-Simulated NYSE equity data must include at least 500 synthetic securities, each with ticker, name, SOD bid, SOD ask, EOD bid, EOD ask. No real or externally sourced market data is required or permitted. Scope: reference data seeding script. Verification: seed script produces at least 500 rows in `reference_data`, each with all six price fields non-null and non-zero.
-
-**Rule 7 — Batch Memory Cap**
-No UI operation may load more than 1,000 account records into memory simultaneously. Background jobs processing accounts in bulk must paginate at 1,000 records or fewer per page. Scope: all UI list operations and job processing loops. Verification: Instruments memory profiler shows 1,000 or fewer account objects live simultaneously during any batch operation.
-
-**Rule 8 — MySQLKit-Only Persistence**
-SwiftData must not appear anywhere in the project. All DB interactions must use MySQLKit. Scope: entire project. Verification: `grep -r "import SwiftData"` returns zero results.
-
-**Rule 9 — Offline Runtime**
-The application must function with the network adapter disabled. All data sources (MySQL, CSV files) must be local. Scope: entire application runtime. Verification: application operates normally with Wi-Fi and Ethernet disabled.
-
-**Rule 10 — Schema Referential Integrity**
-All inter-table relationships must be enforced via MySQL foreign key constraints. Each primary entity (account, position, transaction, user, account_group, entitlement, reference_data) must occupy a distinct table with a typed primary key. Scope: MySQL schema DDL. Verification: `SHOW CREATE TABLE [table]` reveals FK constraints on all relationship columns.
-
-**Rule 11 — Cached Valuation Denormalization**
-The `accounts` table must store a cached latest valuation amount and value date. This cache must be updated atomically within the same DB transaction as each valuation run completion. Scope: `accounts` table and `ValuationEngine` write path. Verification: `accounts` row reflects correct valuation amount and date immediately after valuation completes.
-
-**Rule 12 — Validation Framework Gates**
-The deliverable is not accepted until all validation gates pass:
-- Gate 1: End-to-end boundary verification against live MySQL (no mocks) traversing AccountManagement → LedgerEngine → ValuationEngine → UI Layer
-- Gate 2: Zero-warning Xcode build with Swift 6 strict concurrency; no `@unchecked Sendable` or warning suppressions
-- Gate 8: Integration sign-off (live smoke test, entitlement contract, valuation correctness with timezone verification, batch performance thresholds)
-- Gate 9: Integration wiring verification (every module referenced by a SwiftUI view, reachable from `@main`, exercised via integration test against live MySQL)
-- Gate 10: Test execution via `xcodebuild test -scheme [SchemeName] -destination 'platform=macOS'` with `accounting_test` schema created/dropped by test suite
-
-**Rule 13 — Performance Thresholds**
-All performance thresholds must be met on target hardware (Apple Silicon M5, 16GB RAM):
-- Full-universe search (100,000 accounts): under 2 seconds
-- Batch valuation (1,000 accounts): under 30 seconds
-- Accounts Viewer initial render (1,000 accounts): under 1 second
-- Accounts Viewer scrolling: 30fps or above
-- CSV ingestion (up to 100MB): no crash, completes to completion
-- MySQL RAM footprint: under 4GB
-- Concurrent users: 1 (by design)
-
-
-## 0.8 References
-
-
-### 0.8.1 Repository Files and Folders Searched
-
-The following files and folders were searched across the codebase to derive conclusions for this Agent Action Plan:
-
-| Path | Type | Findings |
-|------|------|----------|
-| `""` (root) | Folder | Greenfield repository containing only `README.md` |
-| `README.md` | File | Contains only `# MikeRepo` — placeholder content |
-| `/tmp/environments_files/` | Directory | Empty — no user-provided environment files |
-| `**/` (recursive) | Pattern | No `.blitzyignore` files found anywhere in the filesystem |
-
-The repository is confirmed to be in a **pre-development greenfield state** with no source code, no dependency manifests, no build tooling, no CI/CD pipelines, and no infrastructure definitions. All technical decisions documented in this plan represent new constructions.
-
-### 0.8.2 Technical Specification Sections Retrieved
-
-The following tech spec sections were retrieved for contextual analysis:
-
-| Section | Key Findings |
-|---------|-------------|
-| §1.1 Executive Summary | Confirmed greenfield state at commit `103791c`, initialized April 13, 2026; branches `main` and `v01` identical |
-| §2.2 Feature Catalog | Five sequential features: F-001 (completed), F-002–F-005 (proposed); no existing implementation beyond `README.md` |
-| §3.1 Programming Languages | Tech spec lists Objective-C for macOS and Swift for iOS only — **overridden by user requirements** specifying Swift 6.x for macOS desktop |
-| §3.2 Frameworks & Libraries | Tech spec lists Electron for desktop — **overridden by user requirements** specifying SwiftUI; no MySQLKit mentioned in spec |
-| §3.3 Open Source Dependencies | Tech spec lists Python/JavaScript packages only — **overridden by user requirements** specifying MySQLKit and BCryptSwift via SPM |
-| §3.5 Databases & Storage | Tech spec lists MongoDB — **overridden by user requirements** specifying MySQL 8.0 |
-| §5.1 High-Level Architecture | Multi-tier client-server with Flask backend — **not applicable to this standalone macOS desktop application** |
-
-**Critical discrepancy resolution:** The existing tech spec documents a multi-platform product with Python/Flask backend, React web frontend, and MongoDB database. The user's requirements for this section describe a completely different architecture — a standalone macOS desktop application with Swift/SwiftUI/MySQLKit/MySQL 8.0 and zero network dependencies. The user's requirements take precedence for all architectural and technology decisions in this Agent Action Plan.
-
-### 0.8.3 Web Research Conducted
-
-| Topic | Source | Key Finding |
-|-------|--------|-------------|
-| Swift version | swift.org, GitHub swift-evolution | Swift 6.3 released March 24, 2026; Swift 6.4 announced March 18, 2026 |
-| Xcode version | Apple App Store listing | Xcode 26.4 includes Swift 6.3 and macOS 26.4 SDK |
-| macOS Tahoe | Wikipedia, Apple support | macOS Tahoe (version 26) released September 15, 2025; latest 26.4.1 |
-| Apple M5 | Apple newsroom | M5 MacBook Pro released October 2025; M5 MacBook Air released early 2026 |
-| MySQLKit | GitHub vapor/mysql-kit | Latest release 4.9.0; depends on MySQLNIO 1.7.2, SQLKit 3.33.0, AsyncKit 1.20.0 |
-| MySQLKit Package.swift | GitHub vapor/mysql-kit/Package.swift | swift-tools-version 5.10; requires swift-crypto 2.0.0..<4.0.0, swift-nio 2.82.0 |
-| BCryptSwift | Swift Package Index | BCryptSwift v2.0.1 compatible with Swift 6.2/6.1/6.0/5.10; no external dependencies |
-| Vapor BCrypt | Vapor docs, GitHub vapor-community/bcrypt | Vapor provides BCrypt hashing; standalone BCryptSwift is preferred for non-Vapor apps |
-
-### 0.8.4 User-Provided Attachments and Metadata
-
-| Item | Details |
-|------|---------|
-| Attachments | No attachments provided |
-| Figma URLs | No Figma URLs specified |
-| Environment files | None found in `/tmp/environments_files/` |
-| Environment variables | None provided |
-| Secrets | None provided |
-| Implementation rules | None provided beyond the rules embedded in the prompt itself |
-| Setup instructions | "None provided" for Environment 1 |
-
-### 0.8.5 Technology Version Summary
-
-The following versions are confirmed for this implementation based on user requirements and web research:
-
-| Technology | Version | Source of Truth |
-|-----------|---------|-----------------|
-| Swift | 6.3 | User specifies "Swift 6.x"; latest stable is 6.3 per swift.org |
-| SwiftUI | macOS 26 SDK | Ships with Xcode 26.4; no separate version |
-| Xcode | 26.4 | Latest stable release; includes Swift 6.3 |
-| macOS | Tahoe (26) | User specifies "macOS Tahoe" |
-| Apple Silicon | M5 | User specifies "Apple Silicon M5, 16GB RAM" |
-| MySQL | 8.0 | User specifies "MySQL 8.0 (local Homebrew)" |
-| MySQLKit | 4.9.0 | Latest release from vapor/mysql-kit GitHub |
-| MySQLNIO | 1.7.2 | Transitive dependency of MySQLKit 4.9.0 |
-| SQLKit | 3.33.0 | Transitive dependency of MySQLKit 4.9.0 |
-| AsyncKit | 1.20.0 | Transitive dependency of MySQLKit 4.9.0 |
-| swift-crypto | 3.4.0 | Transitive dependency resolved by SPM |
-| swift-nio | 2.82.0 | Transitive dependency of MySQLKit 4.9.0 |
-| swift-nio-ssl | 2.30.0 | Transitive dependency of MySQLKit 4.9.0 |
-| BCryptSwift | 2.0.1 | Latest release from wisetail/BCryptSwift |
-| Swift Testing | Built-in (6.3) | Test framework included with Swift 6.3 toolchain |
+**Diagram 3 — Heterogeneous Scope Handling (R10)** (in `docs/grade-history.md`):
+
+```mermaid
+flowchart TD
+    A[Run Scope: list of org/repo] --> B{For each repo}
+    B --> C[Lookup prior grade by application_id]
+    C --> D{Prior record exists?}
+    D -->|Yes| E[Render prior grade + ISO date]
+    D -->|No| F[Render N/A in prior-grade slot]
+    E --> G[Compute current run grade per facet]
+    F --> G
+    G --> H[Persist new record with run_date]
+    H --> I[Append matrix row]
+```
+
+**Diagram 4 — CVE Severity Tier Mapping** (in `docs/facets.md` § Security Summary):
+
+```mermaid
+flowchart LR
+    A[CVE record from NVD or OSV] --> B[Extract CVSS v3.1 base score]
+    B --> C{Score range}
+    C -->|9.0 - 10.0| D[Critical]
+    C -->|7.0 - 8.9| E[High]
+    C -->|4.0 - 6.9| F[Medium]
+    C -->|0.1 - 3.9| G[Low]
+    C -->|None| H[Insufficient Data]
+```
+
+**Diagram 5 — PDF Section Layout (R8)** (in `docs/pdf-output.md`):
+
+```mermaid
+flowchart TD
+    A[Page 1: Executive Summary] --> B[Total Applications]
+    A --> C[Grade Distribution per Facet]
+    A --> D[Top Critical / High CVE Findings]
+    A --> E[Highest Maturity Risk Apps]
+    A --> F[Trend vs Prior Run]
+    G[Page 2+: Application Matrix Table] --> H[Row per Repository]
+    H --> I[Tech Stack Summary]
+    H --> J[Maturity Summary]
+    H --> K[Security Summary]
+    H --> L[Complexity Summary]
+    A -.section break.-> G
+```
+
+**Screenshot/Image Requirements:** None. The PDF output is described via a Markdown mockup in `examples/sample-pdf-mockup.md` rather than a binary image, preserving the textual-citation convention of the documentation set.
+
+**Architecture Diagram Specifications:** All diagrams above use Mermaid syntax compatible with the GitHub Markdown renderer (no extensions, no themes). Node labels are kept to two-line maximum for legibility in CIO/CTO review contexts.
+
+## 0.5 Documentation File Transformation Mapping
+
+### 0.5.1 File-by-File Documentation Plan
+
+Every file in the new template package is enumerated below. Because this is a greenfield package, every entry is a `CREATE`. No `UPDATE`, `DELETE`, or `REFERENCE` actions are taken against existing repository content; the WealthLedger documentation files are left strictly untouched.
+
+**Documentation Transformation Modes:**
+
+- `CREATE` — Author a new documentation file
+- `UPDATE` — Modify an existing documentation file
+- `DELETE` — Remove an obsolete documentation file
+- `REFERENCE` — Use as an example for documentation style and structure (no modification)
+
+| Target Documentation File | Transformation | Source / Inputs | Content / Changes |
+|---|---|---|---|
+| `templates/technology-estate-report/README.md` | CREATE | User prompt (sections 1–6) | Package overview, file map of the new directory, quick-start invocation snippet, links to all `docs/*.md` pages, statement of standalone status (no dependency on other Blitzy flows or templates) |
+| `templates/technology-estate-report/CHANGELOG.md` | CREATE | New | Versioned change history seeded with a `v0.1.0 — Initial template authoring` entry |
+| `templates/technology-estate-report/template.md` | CREATE | User prompt (sections 1–6, verbatim where required) | Canonical Blitzy prompt entry point: role definition, task context, technical specifications block, boundaries and preservation block, full text of Rules R1–R10, full text of Validation Gates 1, 2, 8, 9, 10, full text of domain-specific success criteria |
+| `templates/technology-estate-report/schemas/rubric.schema.json` | CREATE | User prompt § "Grading Engine" | JSON Schema (Draft 2020-12) defining a top-level `rubric` object with one named-property per facet (`tech_stack`, `maturity`, `security`, `complexity`); each property is an array of `{ grade: A\|B\|C\|D\|F, criteria: string }` objects |
+| `templates/technology-estate-report/schemas/grade-history.schema.json` | CREATE | User prompt § "Grade Persistence" | JSON Schema for a single record: `{ application_id: string (org/repo regex), facet: enum, run_date: ISO 8601 datetime, grade: A\|B\|C\|D\|F\|TBD\|N/A\|InsufficientData, scan_metadata: { timestamp, sources[] } }` |
+| `templates/technology-estate-report/schemas/report-output.schema.json` | CREATE | User prompt § "Output" | JSON Schema for the intermediate report data object that drives PDF rendering: top-level `executive_summary` and `matrix` properties |
+| `templates/technology-estate-report/config/facets.yaml` | CREATE | User prompt § "Facet Analysis" table | Per-facet feature flags (enabled), severity tier thresholds for Security, "Insufficient Data" threshold conditions, default rendering options |
+| `templates/technology-estate-report/config/rubric-example.yaml` | CREATE | User prompt § "Rules" example | Worked example rubric showing the user's stated example: "No library out of support = A for Maturity" |
+| `templates/technology-estate-report/config/allow-list.yaml` | CREATE | User prompt R6 + § "Boundaries" | Network-egress allow-list: `api.github.com`, `gitlab.com/api/v4`, `endoflife.date`, `services.nvd.nist.gov`, `api.osv.dev`; explicit deny clause for any SaaS vendor host |
+| `templates/technology-estate-report/examples/sample-rubric.yaml` | CREATE | User prompt § "Grading Engine" | Production-ready rubric covering all four facets, with explanatory comments on each grade threshold |
+| `templates/technology-estate-report/examples/sample-pdf-mockup.md` | CREATE | User prompt § "Output" + R8 + Executive Summary content list | Markdown mockup of the rendered PDF showing exactly the executive summary content and the four-column matrix with worked example rows |
+| `templates/technology-estate-report/examples/grade-history-example.json` | CREATE | User prompt § "Grade Persistence" + R3 | Sample grade-history records demonstrating: a first-run record (no prior), a second-run record (with prior + ISO date), and a net-new repo joining a recurring run |
+| `templates/technology-estate-report/docs/usage.md` | CREATE | User prompt §§ 1, 2, 5 | Step-by-step author workflow: provision `GITHUB_TOKEN` / `GITLAB_TOKEN`, optionally provision `NVD_API_KEY`, author rubric YAML, invoke template, retrieve PDF |
+| `templates/technology-estate-report/docs/architecture.md` | CREATE | User prompt §§ 3, Gate 9 | Component inventory diagram (Mermaid), single-repository run sequence diagram (Mermaid), seven-component reachability matrix (Gate 9 contract) |
+| `templates/technology-estate-report/docs/facets.md` | CREATE | User prompt § "Facet Analysis" + § "Technical Specifications" | All four facets in one document; per-facet sections covering data sources, detection algorithm, "Insufficient Data" conditions, output cell content; CVE severity tier mapping diagram |
+| `templates/technology-estate-report/docs/grading-engine.md` | CREATE | User prompt § "Grading Engine" + R1 + Gate 8 (rubric verification) | Rubric input format with worked examples, evaluation procedure (per-application, per-facet), grade emission contract, R1 verification procedure (different rubric → different grade) |
+| `templates/technology-estate-report/docs/grade-history.md` | CREATE | User prompt § "Grade Persistence" + R3, R7, R10 | Storage key shape, immutability contract, retrieval procedure, `N/A` rendering rule, heterogeneous-scope flow diagram, new-repo onboarding procedure |
+| `templates/technology-estate-report/docs/executive-summary.md` | CREATE | User prompt § "Executive Summary content" bullet list | Portfolio-level aggregation rules: total-applications counting, A–F distribution counting per facet, top Critical/High CVE ranking and limit, highest-maturity-risk ranking formula, trend-versus-prior-run computation |
+| `templates/technology-estate-report/docs/pdf-output.md` | CREATE | User prompt § "Output" + R8 + R3 cell-format example | Two-section ordering rule, executive summary content list, matrix table column order (Tech Stack \| Maturity \| Security \| Complexity), cell-rendering format `B  ←  prev: C  \|  2025-10-01`, page break rules, section-layout diagram |
+| `templates/technology-estate-report/docs/api-integrations.md` | CREATE | Web search findings (NVD, OSV, endoflife.date) + R6, R9 | GitHub/GitLab API contract, endoflife.date API contract, NVD CVE API v2.0 contract, OSV API v1 contract, rate-limit handling, retry semantics, network-egress allow-list, R6 and R9 attribution rules |
+| `templates/technology-estate-report/docs/configuration.md` | CREATE | `config/*.yaml` files | Configuration file reference: documented keys, default values, override procedure for each `config/*.yaml` file |
+| `templates/technology-estate-report/docs/troubleshooting.md` | CREATE | User prompt R2 + Gate 2 | Failure-mode-to-cell-value mapping table; common authentication failures; rate-limit recovery; "Insufficient Data" cell rendering rules |
+| `templates/technology-estate-report/docs/validation.md` | CREATE | User prompt §§ Gates 1, 2, 8, 9, 10 + Domain success criteria | Single-command execution path (Gate 10), live smoke test runbook (Gate 1), zero-warning contract (Gate 2), four-item integration sign-off checklist (Gate 8), seven-component reachability matrix (Gate 9), domain-specific success criteria as test assertions |
+
+**Inventory Completeness Statement:** The above table represents the complete inventory of files to be authored for this template package. There are no "to be discovered" or "pending" files. Every file path, transformation mode, source input, and content description is fully specified. Wildcard generalization is applied only at the directory level (`docs/*.md` is enumerated explicitly file-by-file above; `schemas/*.json` likewise; `config/*.yaml` likewise; `examples/*` likewise).
+
+### 0.5.2 New Documentation Files Detail
+
+**File: `templates/technology-estate-report/template.md`**
+
+- **Type:** Canonical Blitzy prompt entry point
+- **Source Inputs:** User-provided prompt sections 1 (Role Definition), 2 (Task Context), 3 (Technical Specifications), 4 (Boundaries & Preservation), 5 (Rules R1–R10), 6 (Validation Framework — Gates 1, 2, 8, 9, 10 + Domain success criteria)
+- **Sections (in order):**
+  - Role Definition (verbatim from user prompt § 1)
+  - Task Context (verbatim from user prompt § 2)
+  - Technical Specifications: Ingestion (verbatim), Facet Analysis table (verbatim), Grading Engine (verbatim), Grade Persistence (verbatim), Executive Summary content (verbatim), Output specification (verbatim)
+  - Boundaries & Preservation (verbatim from user prompt § 4)
+  - Rules R1–R10 (verbatim from user prompt § 5)
+  - Validation Framework (verbatim from user prompt § 6)
+  - File-map links: `./schemas/rubric.schema.json`, `./schemas/grade-history.schema.json`, `./schemas/report-output.schema.json`, `./docs/*.md`
+- **Diagrams:** Embedded link to `./docs/architecture.md` for the component inventory and sequence diagrams; no diagrams inlined in `template.md` itself
+- **Key Citations:** User prompt §§ 1–6 verbatim; no other sources
+
+**File: `templates/technology-estate-report/docs/facets.md`**
+
+- **Type:** Facet reference documentation
+- **Source Inputs:** User prompt § "Facet Analysis" table; web research on NVD, OSV, endoflife.date, CycloneDX
+- **Sections:**
+  - § Tech Stack Summary — file-extension-to-language map; cloud provider identification rule from IaC; vendor/framework extraction rule per dependency manifest format (package.json, requirements.txt, pom.xml, go.mod, Gemfile, Pipfile, build.gradle, .csproj, Cargo.toml)
+  - § Maturity Summary — endoflife.date `/api/v1/products/{product}/` lookup; product slug resolution table; vendor version staleness rule; technical debt scoring formula
+  - § Security Summary — SBOM generation per ecosystem (CycloneDX); NVD `/rest/json/cves/2.0/` query; OSV `/v1/querybatch` query; CVSS-to-severity-tier mapping diagram; severity tier counting rule; scan timestamp and database attribution recording (R9)
+  - § Complexity Summary — LOC counting rule; file count rule; contributor-count-from-git-history rule; "Grade: TBD — definition pending" placeholder render contract (R5)
+- **Diagrams:** CVE Severity Tier Mapping (Mermaid)
+- **Key Citations:** Web research §§ NVD CVE API v2.0, OSV API v1, endoflife.date API v1, CycloneDX SBOM tooling
+
+**File: `templates/technology-estate-report/docs/grading-engine.md`**
+
+- **Type:** Grading engine reference documentation
+- **Source Inputs:** User prompt § "Grading Engine" + R1 + Gate 8
+- **Sections:**
+  - § Rubric Input Format — links to `../schemas/rubric.schema.json`; YAML example
+  - § Authoring a Rubric — worked example: "No library out of support = A for Maturity"
+  - § Evaluation Procedure — per-application, per-facet rubric application; deterministic letter grade emission
+  - § Complexity Lock — Complexity grade is locked to TBD until a rubric is provided (R5)
+  - § R1 Verification Procedure — generate report twice with different rubrics; assert different grade outputs
+- **Diagrams:** None
+- **Key Citations:** User prompt § "Grading Engine"; R1; Gate 8
+
+**File: `templates/technology-estate-report/docs/grade-history.md`**
+
+- **Type:** Grade history persistence reference documentation
+- **Source Inputs:** User prompt § "Grade Persistence" + R3, R7, R10
+- **Sections:**
+  - § Storage Key — `(application_id, facet, run_date)` shape with `application_id` defined as `org/repo` regex per R7
+  - § Immutability Contract — prior-run records MUST NOT be mutated by subsequent runs
+  - § Retrieval — lookup prior record by `(application_id, facet)`; return latest by `run_date`
+  - § Rendering — current grade prominent; prior grade + ISO 8601 date in secondary text per R3 example `B  ←  prev: C  |  2025-10-01`; `N/A` when no prior record exists
+  - § Heterogeneous Scope — flowchart for R10 mixing first-run and recurring repositories
+  - § New Repository Onboarding — procedure for adding a new repository to a recurring run
+- **Diagrams:** Heterogeneous Scope Handling (Mermaid)
+- **Key Citations:** User prompt § "Grade Persistence"; R3; R7; R10
+
+**File: `templates/technology-estate-report/docs/pdf-output.md`**
+
+- **Type:** PDF output contract reference documentation
+- **Source Inputs:** User prompt § "Output" + R8 + R3 cell-format example
+- **Sections:**
+  - § Section Order — Executive Summary precedes Matrix Table per R8
+  - § Executive Summary Content — verbatim bullet list from user prompt
+  - § Matrix Table Columns — Tech Stack Summary \| Maturity Summary \| Security Summary \| Complexity Summary, in this exact order
+  - § Cell Rendering Format — `B  ←  prev: C  |  2025-10-01` per R3 example; `N/A` for first-run pairs; `Insufficient Data` for failed-data-source cells per R2; `Grade: TBD — definition pending` for Complexity per R5
+  - § Page Layout — Page 1 contains executive summary content; matrix table begins on page 2 or later
+  - § R8 Verification Procedure — assert PDF page 1 contains executive summary; matrix table not the first content element
+- **Diagrams:** PDF Section Layout (Mermaid)
+- **Key Citations:** User prompt § "Output"; R3; R8
+
+**File: `templates/technology-estate-report/docs/api-integrations.md`**
+
+- **Type:** External API contract reference documentation
+- **Source Inputs:** Web research findings (NVD, OSV, endoflife.date, GitHub, GitLab); user prompt R6, R9
+- **Sections:**
+  - § GitHub API — base URL, authentication via `GITHUB_TOKEN`, rate-limit headers, recommended pagination
+  - § GitLab API — base URL, authentication via `GITLAB_TOKEN`, rate-limit semantics, recommended pagination
+  - § endoflife.date API v1 — base URL `https://endoflife.date/api/v1/`, no authentication required, beta-status caveat <cite index="3-3">The API is currently in Beta, and breaking changes can happen.</cite>
+  - § NVD CVE API v2.0 — base URL `https://services.nvd.nist.gov`, optional `NVD_API_KEY`, rate-limit semantics <cite index="14-27">a rate limit of 50 requests per 30-second window (for requests with API Key; without Key it's only 5 requests)</cite>, 429 response handling <cite index="15-5">requests being rate limited will now provide a status code of 429</cite>
+  - § OSV API v1 — base URL `https://api.osv.dev`, no authentication required, recommended HTTP/2 transport <cite index="25-12">We recommend using HTTP/2 for queries that may result in large responses</cite>, batched query endpoint preference <cite index="30-6">POST /v1/querybatch is 3x faster</cite>
+  - § Network Egress Allow-List — listed hosts only; explicit deny for any SaaS vendor host (R6)
+  - § R9 Attribution Rule — every Security Summary result includes scan timestamp (ISO 8601) and source database label (NVD, OSV, or both)
+- **Diagrams:** None
+- **Key Citations:** Web research (cited above); user prompt R6, R9
+
+**File: `templates/technology-estate-report/docs/validation.md`**
+
+- **Type:** Validation harness reference documentation
+- **Source Inputs:** User prompt §§ Gates 1, 2, 8, 9, 10 + Domain success criteria
+- **Sections:**
+  - § Gate 1 — End-to-end live smoke test runbook with designated test repository pointer
+  - § Gate 2 — Zero-warning contract; failure-mode-to-`Insufficient Data` mapping
+  - § Gate 8 — Four-item integration sign-off checklist (live smoke test, API contract verification, grade history verification, rubric verification)
+  - § Gate 9 — Seven-component reachability matrix: tech stack detector, maturity analyzer, CVE scanner, complexity extractor, grading engine, grade persistence store, PDF renderer; each mapped to at least one end-to-end test
+  - § Gate 10 — Single-command execution path; provisioning of `GITHUB_TOKEN`/`GITLAB_TOKEN`, optional `NVD_API_KEY`; assertion procedure on generated PDF
+  - § Domain Success Criteria — Each user-stated criterion mapped to a specific assertion: every repo produces a populated row; maturity grade reflects EOL status; CVE counts match NVD/OSV lookup for a known-vulnerable dependency version; grade history continuous across three sequential runs; executive summary distribution counts match individual application sums
+- **Diagrams:** None
+- **Key Citations:** User prompt Gates 1, 2, 8, 9, 10; Domain success criteria
+
+### 0.5.3 Documentation Files to Update Detail
+
+**No existing documentation files are updated by this work.** The new template package is a self-contained directory at `templates/technology-estate-report/`. The WealthLedger documentation (`README.md`, `Docs/*.md`, `blitzy/documentation/*.md`) is left strictly unchanged.
+
+### 0.5.4 Documentation Configuration Updates
+
+This template package introduces no static-site-generator configuration (no `mkdocs.yml`, no `docusaurus.config.js`, no `sphinx/conf.py`, no `.readthedocs.yml`). The package is consumed directly as Markdown by Blitzy.
+
+The package's own configuration files (`config/facets.yaml`, `config/rubric-example.yaml`, `config/allow-list.yaml`) are documented in `docs/configuration.md` and listed in the file transformation table above; they are configuration of the template's own behavior, not documentation-generator configuration.
+
+### 0.5.5 Cross-Documentation Dependencies
+
+| Dependency Type | Source Document | Target Document | Mechanism |
+|---|---|---|---|
+| Schema reference | `docs/grading-engine.md` | `schemas/rubric.schema.json` | Markdown relative-path link `../schemas/rubric.schema.json` |
+| Schema reference | `docs/grade-history.md` | `schemas/grade-history.schema.json` | Markdown relative-path link |
+| Schema reference | `docs/pdf-output.md` | `schemas/report-output.schema.json` | Markdown relative-path link |
+| Configuration reference | `docs/configuration.md` | `config/facets.yaml`, `config/rubric-example.yaml`, `config/allow-list.yaml` | Markdown relative-path link |
+| Example reference | `docs/grading-engine.md` | `examples/sample-rubric.yaml` | Markdown relative-path link |
+| Example reference | `docs/grade-history.md` | `examples/grade-history-example.json` | Markdown relative-path link |
+| Example reference | `docs/pdf-output.md` | `examples/sample-pdf-mockup.md` | Markdown relative-path link |
+| Architecture reference | `template.md` | `docs/architecture.md` | Markdown relative-path link |
+| Top-level navigation | `README.md` | All `docs/*.md`, `schemas/*.json`, `config/*.yaml`, `examples/*` | File map table with relative-path links |
+
+**Navigation Links:** All cross-document links are relative paths within the `templates/technology-estate-report/` directory. No links reach outside this directory. This preserves the standalone-package property required by the user prompt.
+
+**Table of Contents:** The top-level `README.md` serves as the package's table of contents. No separate TOC document is created.
+
+**Index/Glossary:** A short glossary section is included in `README.md` defining the terms `facet`, `application`, `run`, `rubric`, and `grade history`. No separate glossary file is created.
+
+## 0.6 Dependency Inventory
+
+### 0.6.1 Documentation Dependencies
+
+This template package is itself documentation: it is composed of Markdown, JSON Schema, and YAML files, none of which require a build toolchain to be authored or consumed. There is therefore no required runtime, framework, or library that must be installed in order to *deliver* the documentation. The dependencies enumerated below are external services and reference documentation that the template *describes* and *cites*; they are not packages that must be installed in this repository.
+
+The versions documented below are the versions cited by the template and validated via the web research conducted in sub-section 0.2.3. They represent the highest stable versions available as of the authoring date; the template documentation explicitly carries the version-pinning guidance for each.
+
+**External APIs Documented and Cited:**
+
+| Source | Service / API | Version | Purpose | Authentication |
+|---|---|---|---|---|
+| github.com | GitHub REST API | v3 (REST) and v4 (GraphQL) | Source repository ingestion (artifact retrieval) | `GITHUB_TOKEN` (Personal Access Token or GitHub App installation token) |
+| gitlab.com | GitLab REST API | v4 | Source repository ingestion (artifact retrieval) | `GITLAB_TOKEN` (Personal Access Token or Project Access Token) |
+| endoflife.date | endoflife.date API | v1 (Beta) | Library and runtime EOL status lookup for the Maturity Summary facet — <cite index="3-1,3-2,3-3">An API is available for integration with CI platforms. API documentation is available at https://endoflife.date/docs/api/v1/. The API is currently in Beta, and breaking changes can happen.</cite> | None — <cite index="10-3">Currently no authentication required</cite> |
+| services.nvd.nist.gov | NVD CVE API | v2.0 | CVE record retrieval for the Security Summary facet — <cite index="16-1">The NIST NVD connector uses the Product API v2.0 and Vulnerability API v2.0.</cite> | Optional `NVD_API_KEY` to raise the rate limit from 5 to 50 requests per 30-second window <cite index="14-27">a rate limit of 50 requests per 30-second window (for requests with API Key; without Key it's only 5 requests)</cite> |
+| api.osv.dev | OSV API | v1 | CVE record retrieval (alternate / cross-reference source) for the Security Summary facet — <cite index="21-7,21-8">An easy-to-use API is available to query for all known vulnerabilities by either a commit hash, or a package version.</cite> | None |
+
+**SBOM Generation Tooling Cited (Documented in `docs/api-integrations.md` § SBOM Generation):**
+
+The template documents per-ecosystem SBOM generators used by the CVE scanner. These are NOT installed in this repository; they are external tools the template's documentation references for use during ingestion.
+
+| Registry | Package Name | Version | Purpose |
+|---|---|---|---|
+| OWASP CycloneDX | CycloneDX BOM Standard | 1.6 (current spec) | Vendor-neutral SBOM specification — <cite index="34-1,34-2">OWASP CycloneDX is a full-stack Bill of Materials (BOM) standard that provides advanced supply chain capabilities for cyber risk reduction. The specification supports Software Bill of Materials (SBOM)</cite> |
+| npm | @cyclonedx/cyclonedx-npm | latest stable | Generate CycloneDX SBOM from package.json / package-lock.json |
+| pip | cyclonedx-bom (cyclonedx-py) | latest stable | Generate CycloneDX SBOM from requirements.txt / Pipfile.lock / poetry.lock |
+| Maven plugin | org.cyclonedx:cyclonedx-maven-plugin | latest stable | Generate CycloneDX SBOM from pom.xml |
+| Gradle plugin | org.cyclonedx.bom | latest stable | Generate CycloneDX SBOM from build.gradle |
+| dotnet tool | CycloneDX | latest stable | Generate CycloneDX SBOM from .csproj |
+| Go tool | github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod | latest stable | Generate CycloneDX SBOM from go.mod |
+| Cargo subcommand | cargo-cyclonedx | latest stable | Generate CycloneDX SBOM from Cargo.toml |
+| ghcr.io | ghcr.io/cyclonedx/cdxgen | latest stable | Multi-language fallback SBOM generator — <cite index="39-40,39-41">Creates CycloneDX Bill of Materials (BOM) for your projects from source and container images. Supports many languages and package managers.</cite> |
+
+**Per-ecosystem version pinning rationale:** The template documentation pins each generator to its current stable release at the time of authoring rather than the moving "latest" tag, with explicit guidance that the report-generating Blitzy environment must materialize these tools rather than rely on "latest" resolution. The exact version strings are recorded in `docs/api-integrations.md` § SBOM Generation and updated via PRs to that document only.
+
+**Documentation Authoring Tooling (None Required):**
+
+| Item | Required? | Notes |
+|---|---|---|
+| Markdown renderer | Not required for authoring; consumed by Blitzy | All documentation is plain GitHub-Flavored Markdown |
+| Mermaid renderer | Not required for authoring | Diagrams are authored in fenced mermaid blocks; rendered by GitHub or any Mermaid-aware viewer |
+| JSON Schema validator | Recommended for authoring schemas | Any Draft 2020-12 validator (for example, ajv-cli); not pinned because schema authoring is one-time |
+| YAML linter | Recommended for authoring config files | Any YAML linter; not pinned |
+| Static-site generator | Not required | The template package is consumed directly as Markdown by Blitzy; no mkdocs.yml, no docusaurus.config.js, no sphinx/conf.py |
+
+### 0.6.2 Documentation Reference Updates
+
+**No existing documentation files require link updates** because no existing documentation files are modified or referenced by the new template package. The new template package is fully self-contained at `templates/technology-estate-report/` with all internal links resolved as relative paths within that directory.
 
+**Internal link conventions documented in `README.md`:**
+
+- All cross-document links use relative paths from the file containing the link: `./facets.md`, `../schemas/rubric.schema.json`, `../examples/sample-rubric.yaml`
+- All schema references include both a Markdown link and a literal JSON Schema `$ref` URI when the schema is referenced from another schema
+- All external citations (web sources, API documentation URLs) are inline in `docs/api-integrations.md` and not duplicated across other documents
+
+**Link Transformation Rules:** Not applicable — there are no prior link patterns to transform because this is a greenfield package.
+
+## 0.7 Coverage and Quality Targets
+
+### 0.7.1 Documentation Coverage Metrics
+
+Because this is a greenfield template package, the baseline coverage is zero across all facets, and the target coverage is total: every capability, every rule, every gate, every external API contract enumerated in the user prompt MUST be documented in the package. The metric below tracks not "lines of code documented" (none — this package contains no code) but "user-stated requirements covered by an authored artifact."
+
+**Current Coverage Baseline (Pre-Authoring):**
+
+| Coverage Domain | Current Coverage | Target Coverage | Gap |
+|---|---|---|---|
+| Template entry point | 0% | 100% (single `template.md` containing role definition, technical specs, boundaries, rules, gates) | Author `template.md` |
+| Facet documentation (4 facets) | 0% | 100% (all four facets fully documented in `docs/facets.md`) | Author all four facet sections |
+| Grading engine | 0% | 100% (rubric format + evaluation procedure + R1 verification in `docs/grading-engine.md`) | Author `docs/grading-engine.md` and `schemas/rubric.schema.json` |
+| Grade history persistence | 0% | 100% (storage key + immutability + retrieval + N/A rule + R10 heterogeneous scope in `docs/grade-history.md`) | Author `docs/grade-history.md` and `schemas/grade-history.schema.json` |
+| PDF output contract | 0% | 100% (R8 ordering + cell format per R3 example + R5 Complexity placeholder in `docs/pdf-output.md`) | Author `docs/pdf-output.md` and `schemas/report-output.schema.json` |
+| Executive summary aggregation | 0% | 100% (all five user-stated bullet points in `docs/executive-summary.md`) | Author `docs/executive-summary.md` |
+| External API contracts (4 APIs) | 0% | 100% (GitHub, GitLab, endoflife.date, NVD, OSV in `docs/api-integrations.md`) | Author `docs/api-integrations.md` |
+| Validation harness | 0% | 100% (Gates 1, 2, 8, 9, 10 + Domain success criteria in `docs/validation.md`) | Author `docs/validation.md` |
+| Rules (R1–R10) | 0% | 100% (each rule reproduced verbatim in `template.md` and operationalized in the relevant `docs/*.md` page) | Author `template.md` Rules section + propagate to relevant docs |
+| Configuration reference | 0% | 100% (every key in `config/*.yaml` documented in `docs/configuration.md`) | Author `docs/configuration.md` and `config/*.yaml` |
+| Usage / quick-start | 0% | 100% (end-to-end author workflow in `docs/usage.md` and `README.md`) | Author `docs/usage.md` and `README.md` |
+| Architecture / component diagram | 0% | 100% (Mermaid diagrams + Gate 9 reachability matrix in `docs/architecture.md`) | Author `docs/architecture.md` |
+| Troubleshooting | 0% | 100% (failure-mode-to-cell-value mapping in `docs/troubleshooting.md`) | Author `docs/troubleshooting.md` |
+| Examples | 0% | 100% (one rubric example + one PDF mockup + one grade-history example in `examples/`) | Author all `examples/*` files |
+
+**Target Coverage:** 100% on every domain above. Anything less is a Gate 1 / Gate 9 failure because uncovered domains would represent capabilities documented as "in scope" by the user prompt but absent from the delivered template package.
+
+**Coverage Gaps to Address (consolidated from above):**
+
+- All 24 files in the `templates/technology-estate-report/` tree per sub-section 0.5.1 (each file represents one or more coverage domain)
+- Focus areas explicitly per the user prompt: rule-by-rule coverage (R1–R10), gate-by-gate coverage (Gates 1, 2, 8, 9, 10), facet-by-facet coverage (Tech Stack, Maturity, Security, Complexity), domain success criterion coverage (5 specific assertions)
+
+### 0.7.2 Documentation Quality Criteria
+
+**Completeness Requirements:**
+
+- The `template.md` file MUST reproduce verbatim each of: role definition (user prompt § 1), task context (§ 2), all four facet rows of the technical specifications table (§ 3), the grading engine description (§ 3), the grade persistence description (§ 3), the executive summary content list (§ 3), the output specification (§ 3), the boundaries and preservation block (§ 4), Rules R1–R10 (§ 5), and Validation Gates 1, 2, 8, 9, 10 plus the domain success criteria (§ 6)
+- Each facet section in `docs/facets.md` MUST document data sources, detection algorithm, "Insufficient Data" conditions per R2, and the cell-content format
+- Each rule in `template.md` MUST be cross-referenced from the document that operationalizes it (R1 from `docs/grading-engine.md`, R2 from `docs/troubleshooting.md`, R3/R7/R10 from `docs/grade-history.md`, R4/R9 from `docs/api-integrations.md` and `docs/facets.md`, R5 from `docs/facets.md` and `docs/pdf-output.md`, R6 from `docs/api-integrations.md`, R8 from `docs/pdf-output.md`)
+- Each validation gate in `docs/validation.md` MUST include a single-command execution path (Gate 10) that a reviewer can follow without modification
+- Every user-stated example MUST be preserved verbatim (the cell-format example `B  ←  prev: C  |  2025-10-01`, the rubric example "No library out of support = A for Maturity")
+
+**Accuracy Validation:**
+
+- All API contract details (base URL, authentication, rate limits, response semantics) MUST match the cited authoritative source for each API; per the web research in sub-section 0.2.3, the cited sources are: <cite index="10-3">Currently no authentication required</cite> for endoflife.date, <cite index="14-27">a rate limit of 50 requests per 30-second window (for requests with API Key; without Key it's only 5 requests)</cite> for NVD, <cite index="25-12">We recommend using HTTP/2 for queries that may result in large responses</cite> for OSV
+- All schema fragments embedded in documentation MUST validate against their canonical schema file (e.g., a YAML rubric example in `docs/grading-engine.md` MUST validate against `schemas/rubric.schema.json`)
+- All Mermaid diagrams MUST render successfully under the GitHub Markdown renderer
+- All cross-document Markdown links MUST resolve to existing files within the template package
+
+**Clarity Standards:**
+
+- CIO/CTO-facing content (executive summary content list, matrix cell labels) MUST avoid implementation jargon ("CVSS", "SBOM", "CPE") and use business-outcome language ("Critical security findings", "Out-of-support dependencies")
+- Implementation-facing content (facet algorithms, API contracts, grading engine) MAY use technical terminology because its audience is the Blitzy execution engine and the template authors
+- Progressive disclosure is honored: `README.md` introduces concepts at the package level, `docs/*.md` pages provide depth, and `schemas/*.json` provide the formal contract
+- Consistent terminology is enforced across all documents per the glossary in `README.md`: **facet** (not "category" or "dimension"), **application** (not "project" or "service"), **run** (not "execution" or "invocation"), **rubric** (not "grading scheme" or "rules"), **grade history** (not "audit log" or "trail")
+
+**Maintainability:**
+
+- Every rule (R1–R10) and every gate (1, 2, 8, 9, 10) is sourced verbatim from the user prompt and is annotated with its rule/gate identifier in every place it is cited
+- Every external API contract carries the date of the cited source documentation in `docs/api-integrations.md` so that a future reader knows the as-of date
+- The CHANGELOG.md captures every modification to the package after authoring, with the rule/gate identifier of the modification's rationale where applicable
+- The package is template-driven: each new facet documentation page follows the same internal structure (Data Sources → Detection Algorithm → Insufficient Data Conditions → Cell Content Format) so that future facet additions can be authored against this template structure
+
+### 0.7.3 Example and Diagram Requirements
+
+**Minimum Examples per Capability:**
+
+- Rubric authoring: one full-coverage example in `examples/sample-rubric.yaml` plus one inline example per facet in `docs/grading-engine.md` (5 examples total)
+- Grade history records: three examples in `examples/grade-history-example.json` — one first-run record, one second-run record showing prior + ISO date, one record for a net-new repo joining a recurring run
+- PDF output: one full Markdown mockup in `examples/sample-pdf-mockup.md` showing the executive summary content and the four-column matrix with at least three worked rows
+- Cell rendering: one example per cell state in `docs/pdf-output.md` — current grade with prior, first-run grade with `N/A`, "Insufficient Data" cell, "Grade: TBD — definition pending" Complexity cell
+
+**Diagram Types Required:**
+
+- Component inventory and data flow (Mermaid graph) — `docs/architecture.md`
+- Single-repository run sequence (Mermaid sequenceDiagram) — `docs/architecture.md`
+- Heterogeneous scope handling (Mermaid flowchart) — `docs/grade-history.md`
+- CVE severity tier mapping (Mermaid flowchart) — `docs/facets.md` § Security Summary
+- PDF section layout (Mermaid flowchart) — `docs/pdf-output.md`
+
+**Code Example Testing:** All YAML and JSON Schema fragments embedded in documentation are validated against their canonical schema files during authoring; this validation is captured as an assertion in `docs/validation.md`.
+
+**Visual Content Freshness:** All diagrams are authored at the time of package creation and updated only via PRs that also update the cited source. The CHANGELOG.md records each diagram update with its rationale.
+
+## 0.8 Scope Boundaries
+
+### 0.8.1 Exhaustively In Scope
+
+The following file paths and content domains are exhaustively in scope for this work. Wildcards (`**/*`) are used only where the directory contents are fully enumerated in sub-section 0.5.1.
+
+**New documentation files (all CREATE):**
+
+- `templates/technology-estate-report/README.md` — package overview and file map
+- `templates/technology-estate-report/CHANGELOG.md` — versioned change history
+- `templates/technology-estate-report/template.md` — canonical Blitzy prompt template entry point
+- `templates/technology-estate-report/docs/usage.md` — author workflow guide
+- `templates/technology-estate-report/docs/architecture.md` — component inventory and data-flow diagrams
+- `templates/technology-estate-report/docs/facets.md` — all four facets (Tech Stack, Maturity, Security, Complexity)
+- `templates/technology-estate-report/docs/grading-engine.md` — rubric format and evaluation procedure
+- `templates/technology-estate-report/docs/grade-history.md` — persistence semantics and N/A rule
+- `templates/technology-estate-report/docs/executive-summary.md` — portfolio-level aggregation rules
+- `templates/technology-estate-report/docs/pdf-output.md` — PDF section ordering and cell-rendering format
+- `templates/technology-estate-report/docs/api-integrations.md` — GitHub, GitLab, endoflife.date, NVD, OSV contracts
+- `templates/technology-estate-report/docs/configuration.md` — config file reference
+- `templates/technology-estate-report/docs/troubleshooting.md` — failure modes and "Insufficient Data" rules
+- `templates/technology-estate-report/docs/validation.md` — Gate 1, 2, 8, 9, 10 procedures
+
+**Schema files (all CREATE):**
+
+- `templates/technology-estate-report/schemas/rubric.schema.json` — JSON Schema for user-supplied rubric
+- `templates/technology-estate-report/schemas/grade-history.schema.json` — JSON Schema for persistence record
+- `templates/technology-estate-report/schemas/report-output.schema.json` — JSON Schema for intermediate report data
+
+**Configuration files (all CREATE):**
+
+- `templates/technology-estate-report/config/facets.yaml` — facet feature flags and severity tier map
+- `templates/technology-estate-report/config/rubric-example.yaml` — worked example rubric
+- `templates/technology-estate-report/config/allow-list.yaml` — network-egress allow-list
+
+**Example files (all CREATE):**
+
+- `templates/technology-estate-report/examples/sample-rubric.yaml` — production-ready example rubric
+- `templates/technology-estate-report/examples/sample-pdf-mockup.md` — Markdown mockup of the rendered PDF
+- `templates/technology-estate-report/examples/grade-history-example.json` — sample persistence records
+
+**Documentation assets:**
+
+- All Mermaid diagrams are authored inline in the relevant `docs/*.md` file using fenced mermaid code blocks; no separate image assets are introduced (no `docs/images/`, no `docs/assets/`)
+- All code examples are authored inline using fenced code blocks; no separate `examples/code/` files are introduced
+- The single combined `examples/` directory contains the three example files listed above
+
+**Documentation generation:**
+
+- No documentation build scripts are introduced (the package is consumed directly by Blitzy as Markdown)
+- No diagram generation configurations are introduced (Mermaid is rendered inline)
+- No API doc generation settings are introduced (this package does not document source code)
+
+**Validation harness:** Authoring of `docs/validation.md` IS in scope. The actual execution of the harness against a live repository is documented as a procedure but is performed downstream by the Blitzy report-generation environment, not by this documentation authoring task.
+
+### 0.8.2 Explicitly Out of Scope
+
+The following are EXPLICITLY out of scope for this work and MUST NOT be modified:
+
+**Existing repository documentation (no modifications):**
+
+- `README.md` (root-level WealthLedger onboarding guide)
+- `Docs/architecture.md` (WealthLedger 11-module architecture)
+- `Docs/database_schema.md` (WealthLedger MySQL schema)
+- `Docs/user_guide.md` (WealthLedger end-user guide)
+- `blitzy/documentation/Project Guide.md` (WealthLedger operating manual)
+- `blitzy/documentation/Technical Specifications.md` (WealthLedger engineering blueprint)
+
+**Existing repository source code (no modifications):**
+
+- `Sources/**/*.swift` (all 11 Swift modules: WealthLedgerApp, SeedTool, AccountManagement, JobScheduler, LedgerEngine, Persistence, RBAC, ReferenceDataService, Shared, UILayer, ValuationEngine)
+- `Tests/**/*.swift` (all WealthLedger unit and integration tests)
+- `Package.swift` (SPM manifest)
+- `Resources/Migrations/*.sql` (all 8 SQL migration files)
+- `Scripts/*` (database bootstrap automation)
+- `WealthLedger.xcodeproj/**` (Xcode project bundle)
+- `.swiftlint.yml`, `.swift-format`, `.gitignore` (existing repository configuration)
+
+**Excluded by user prompt section 4 (Boundaries & Preservation):**
+
+- Live cloud billing APIs (no AWS Cost Explorer, no Azure Cost Management, no GCP Billing integration documented)
+- CMDB / ServiceNow integrations (not documented; explicitly excluded by user)
+- Runtime monitoring data (not documented; explicitly excluded)
+- Live SaaS vendor API calls (not documented; R6 mandates manifest-only sourcing for SaaS license data)
+- Any modification to ingested repositories (the existing Blitzy ingestion pipeline is consumed read-only; no modification documentation is authored)
+
+**Excluded by user prompt minimal-change mandate:**
+
+- Any feature beyond the four defined facets (Tech Stack, Maturity, Security, Complexity) — no fifth or further facet is documented
+- Any grading mechanism beyond the user-supplied A–F rubric — no automated grade inference, no machine-learning-based grade derivation, no peer-comparison grade is documented
+- Any grade-history feature beyond the prior-grade + ISO 8601 date inline display — no trend-graph chart, no quarter-over-quarter delta visualization is documented inside individual cells (portfolio-level trend summary IS in scope per the executive summary content list)
+- Any output format beyond the single PDF — no Markdown report export, no HTML report export, no JSON report export is documented
+
+**Excluded by greenfield-package property:**
+
+- No `mkdocs.yml`, `docusaurus.config.js`, `sphinx/conf.py`, or `.readthedocs.yml` is authored — this package is consumed directly by Blitzy as Markdown
+- No CI/CD pipeline configuration is authored for the package (the package's CI is the user-supplied Validation Framework documented in `docs/validation.md`)
+- No NPM / pip / Maven manifest is authored for the package — there is no buildable artifact
+
+**Excluded by R6 (SaaS data sourcing rule):**
+
+- No documentation of live SaaS vendor endpoints or API calls (Salesforce, ServiceNow, Workday, Zendesk, etc.) is authored
+- No documentation of SaaS vendor authentication flows (OAuth to SaaS vendors) is authored
+- The only documented sources for SaaS license data are repo-tracked manifests; this is enforced in `docs/api-integrations.md` § Network Egress Allow-List
+
+**Excluded by R5 (Complexity placeholder integrity):**
+
+- No A–F grade rubric for the Complexity facet is authored — the facet is documented as locked to "Grade: TBD — definition pending" until the user supplies a rubric in a future run
+- No inferred or backfilled Complexity grade documentation is authored
+
+**All items explicitly excluded by user instructions:** The user's section 4 (Boundaries & Preservation) and the user's "Minimal change mandate" are reproduced verbatim in `template.md` and `docs/troubleshooting.md` to ensure downstream Blitzy executions honor them.
+
+## 0.9 Execution Parameters
+
+### 0.9.1 Documentation-Specific Instructions
+
+**Documentation Build Command:** None required for the documentation package itself. The package is consumed directly by Blitzy as Markdown without any build step. Authoring tools (any text editor; optionally any Markdown viewer with Mermaid support) are sufficient.
+
+**Documentation Preview Command:** None required. Authors may preview the package locally with any of the following (none of which is required to deliver the package, all of which are optional):
+
+- GitHub web UI rendering (push to a branch, view on github.com)
+- VS Code with the built-in Markdown preview (Markdown All-in-One or Markdown Preview Mermaid Support extension for diagram rendering)
+- A local Markdown viewer (e.g., `grip` for GitHub-flavored Markdown rendering)
+
+**Diagram Generation Command:** None required. All diagrams are authored as Mermaid source inside fenced code blocks and rendered by the consuming environment.
+
+**Documentation Deployment Command:** None required. The package is delivered by committing it to the repository at `templates/technology-estate-report/`; no deployment step is involved.
+
+**Default Format:** Markdown with Mermaid diagrams for prose documentation; JSON Schema (Draft 2020-12) for contracts; YAML for configuration. This default is universal across the package; no per-file overrides are documented.
+
+**Citation Requirement:** Every section that draws on the user's prompt MUST cite the source by section heading (e.g., "per user prompt § 3 Technical Specifications" or "per Rule R3"). Every section that draws on external research MUST cite the source URL or retrieval timestamp. Citation style is inline annotation, not footnotes.
+
+**Style Guide to Follow:** The established WealthLedger Tech Spec style (numbered subsections, Markdown prose with embedded Mermaid, tables for contract mappings, short fenced code blocks for fragments). No external style guide (Google, Microsoft, etc.) is mandated.
+
+**Documentation Validation:**
+
+- **Markdown linting:** Optional. The package authors MAY run any Markdown linter (e.g., `markdownlint`, `prettier`); no specific linter is required by this work
+- **Link checking:** Recommended. The package authors SHOULD verify that all internal Markdown links resolve to existing files within the package; any link checker (e.g., `markdown-link-check`) is acceptable
+- **JSON Schema validation:** Required. Each `schemas/*.json` file MUST validate as a valid JSON Schema Draft 2020-12 document; each `examples/*.json` and `config/*.yaml` example referenced from a schema MUST validate against its schema
+- **Mermaid syntax validation:** Recommended. Each fenced mermaid block SHOULD render without error in the GitHub Markdown viewer or any Mermaid live editor; this is captured as a manual review item in `docs/validation.md`
+
+### 0.9.2 Authoring Workflow Parameters
+
+This sub-section documents how the documentation package is authored, not how it is executed by Blitzy. Execution-time parameters are documented within the package itself in `docs/usage.md` and `docs/validation.md`.
+
+**Authoring Sequence (the order in which the files in sub-section 0.5.1 are created):**
+
+1. Top-level `README.md` and `CHANGELOG.md` first to establish the package outline
+2. `template.md` next, since all `docs/*.md` and `schemas/*.json` are downstream of the rules and gates documented in the template body
+3. Schema files (`schemas/*.json`) next, since the documentation pages reference these contracts
+4. Configuration files (`config/*.yaml`) next, since `docs/configuration.md` references these
+5. Documentation pages (`docs/*.md`) in this order: `architecture.md`, `facets.md`, `grading-engine.md`, `grade-history.md`, `executive-summary.md`, `pdf-output.md`, `api-integrations.md`, `configuration.md`, `troubleshooting.md`, `usage.md`, `validation.md`
+6. Example files (`examples/*`) last, since they reference all of the above
+
+This sequence is documented in `CHANGELOG.md` as the v0.1.0 authoring order.
+
+**Authoring Validation Checklist:**
+
+| Check | Method |
+|---|---|
+| Every file in sub-section 0.5.1 exists | List the directory; cross-reference against the file inventory |
+| Every rule R1–R10 is reproduced verbatim in `template.md` | Copy-paste comparison against the user prompt § 5 |
+| Every gate (1, 2, 8, 9, 10) is reproduced verbatim in `template.md` and operationalized in `docs/validation.md` | Copy-paste comparison against the user prompt § 6 |
+| Every facet (Tech Stack, Maturity, Security, Complexity) has a dedicated section in `docs/facets.md` | Heading inventory in `docs/facets.md` |
+| Every schema file is valid JSON Schema Draft 2020-12 | Run `ajv validate` or equivalent against each `schemas/*.json` |
+| Every YAML config is parseable | Run any YAML parser against each `config/*.yaml` and `examples/*.yaml` |
+| Every Mermaid diagram renders | Visual inspection in a Mermaid-aware renderer |
+| Every cross-document Markdown link resolves | Run a link checker against the package |
+| The package contains no links pointing outside `templates/technology-estate-report/` | grep for `../../` or absolute paths in all Markdown files |
+| The user-stated cell-format example `B  ←  prev: C  \|  2025-10-01` is preserved verbatim | Search `docs/pdf-output.md` and `docs/grade-history.md` |
+| The user-stated rubric example "No library out of support = A for Maturity" is preserved verbatim | Search `docs/grading-engine.md` and `examples/sample-rubric.yaml` |
+
+## 0.10 Rules for Documentation
+
+### 0.10.1 Documentation-Specific Rules from User Requirements
+
+The following rules are emphasized by the user for the template package's documentation and behavior. Each rule below is mapped to one or more documentation artifacts that operationalize it; each rule's verification procedure (where stated by the user) is preserved verbatim.
+
+**RULE R1 — Rubric Editability (Author-Time Supply)**
+
+- "The A–F grading rubric MUST be supplied by the report author at generation time. No grade thresholds are hardcoded in the template."
+- Verification (verbatim): "generating a report with two different rubric inputs for the same dataset produces two different grade outputs"
+- **Operationalized in:** `template.md` § Rules, `docs/grading-engine.md` § R1 Verification Procedure, `schemas/rubric.schema.json`, `examples/sample-rubric.yaml`
+
+**RULE R2 — Facet Completeness (Insufficient Data Cell Mandate)**
+
+- "All four facet columns MUST be present in every matrix row in every report run. When source data is unavailable for a facet, the cell renders 'Insufficient Data.' Omitting a cell is prohibited."
+- Verification (verbatim): "no matrix cell is empty or absent in any generated PDF"
+- **Operationalized in:** `template.md` § Rules, `docs/troubleshooting.md` § Failure-Mode-to-Cell-Value Mapping, `docs/pdf-output.md` § Cell Rendering Format, `docs/facets.md` § Insufficient Data Conditions (per facet)
+
+**RULE R3 — Grade History Fidelity (Inline Prior Grade + ISO Date)**
+
+- "Prior grade display MUST include grade letter and ISO 8601 date. When no prior run exists for a facet/application pair, the cell renders 'N/A.'"
+- Verification (verbatim): "a second report run for the same repo shows the first run's grade and date inline"
+- **Operationalized in:** `template.md` § Rules, `docs/grade-history.md` § Rendering, `docs/pdf-output.md` § Cell Rendering Format, `examples/grade-history-example.json`
+- The user-supplied example format `B  ←  prev: C  |  2025-10-01` is preserved verbatim in `docs/pdf-output.md` and `docs/grade-history.md`
+
+**RULE R4 — CVE Severity Breakdown (Four Tiers + Total)**
+
+- "Security Summary MUST report CVE counts broken out by severity tier (Critical, High, Medium, Low) plus a total count. A single aggregate number without severity tiers is a failing state."
+- Verification (verbatim): "Security Summary cell contains four severity labels + total for every application"
+- **Operationalized in:** `template.md` § Rules, `docs/facets.md` § Security Summary § Severity Tier Counting, `docs/api-integrations.md` § NVD CVE API v2.0 § CVSS-to-Severity Mapping
+
+**RULE R5 — Complexity Placeholder Integrity (TBD Until Rubric Provided)**
+
+- "The Complexity column MUST be present and MUST render raw proxy metrics (LOC, file count, contributor count) with the label 'Grade: TBD — definition pending.' The column MUST NOT be removed, collapsed, or backfilled with an inferred grade until an explicit rubric is provided by the user."
+- Verification (verbatim): "Complexity column present in every run; no letter grade appears until rubric is supplied"
+- **Operationalized in:** `template.md` § Rules, `docs/facets.md` § Complexity Summary § Placeholder Render Contract, `docs/pdf-output.md` § Cell Rendering Format § Complexity Cell
+
+**RULE R6 — SaaS Data Sourcing (Manifest-Only)**
+
+- "SaaS license data MUST be sourced exclusively from manifests tracked in the repository. No live SaaS vendor API calls are permitted in v1."
+- Verification (verbatim): "template execution produces no outbound calls to SaaS vendor endpoints"
+- **Operationalized in:** `template.md` § Rules, `docs/api-integrations.md` § Network Egress Allow-List, `config/allow-list.yaml`
+
+**RULE R7 — Application Identity Stability (org/repo Key)**
+
+- "The same repository MUST resolve to the same application identifier across all runs. Identity key is the repository full name (org/repo). Changing the key format between runs is prohibited."
+- Verification (verbatim): "grade history for a repo is continuous across three sequential runs with no duplicate or orphaned entries"
+- **Operationalized in:** `template.md` § Rules, `docs/grade-history.md` § Storage Key, `schemas/grade-history.schema.json` (regex constraint on `application_id`)
+
+**RULE R8 — PDF Section Order (Executive Summary First)**
+
+- "The executive summary MUST precede the matrix table in the PDF. The matrix table MUST NOT be the first content element."
+- Verification (verbatim): "PDF page 1 contains executive summary content; matrix table begins on a subsequent page or section"
+- **Operationalized in:** `template.md` § Rules, `docs/pdf-output.md` § Section Order, `examples/sample-pdf-mockup.md`
+
+**RULE R9 — CVE Attribution (Timestamp + Database Source)**
+
+- "Every Security Summary result MUST include the scan timestamp (ISO 8601) and the source database (NVD, OSV, or both). Undated or unattributed CVE counts are a failing state."
+- Verification (verbatim): "each Security Summary cell or report footnote contains timestamp and database label"
+- **Operationalized in:** `template.md` § Rules, `docs/api-integrations.md` § R9 Attribution Rule, `docs/facets.md` § Security Summary § Scan Metadata, `schemas/grade-history.schema.json` (`scan_metadata` object)
+
+**RULE R10 — New Repo Compatibility (Heterogeneous Scope)**
+
+- "Template execution MUST succeed when a mix of previously-ingested repos and net-new repos are in scope in the same run. Net-new repos receive 'N/A' for prior grade."
+- Verification (verbatim): "a run containing one existing repo and one new repo produces correct grade history for the existing repo and N/A for the new repo"
+- **Operationalized in:** `template.md` § Rules, `docs/grade-history.md` § Heterogeneous Scope, `docs/grade-history.md` § New Repository Onboarding, `examples/grade-history-example.json`
+
+### 0.10.2 Documentation Authoring Rules
+
+The following rules govern the authoring of the documentation package itself; they are derived from the user prompt's "Output Requirements" instruction set and the section prompt's quality directives.
+
+- **Verbatim Preservation Rule:** All rules R1–R10, all validation gates (1, 2, 8, 9, 10), all domain-specific success criteria, and the cell-format example `B  ←  prev: C  |  2025-10-01` MUST be reproduced verbatim from the user prompt without paraphrase or abbreviation
+- **Standalone Package Rule:** All cross-document links MUST resolve within `templates/technology-estate-report/`; no link MAY reach outside this directory; no documentation page MAY depend on existing WealthLedger documentation
+- **Rule-to-Doc Cross-Reference Rule:** Every rule R1–R10 MUST be cross-referenced from the documentation page that operationalizes it (per the mapping in 0.10.1 above); a rule-to-doc-coverage matrix is included in `docs/validation.md`
+- **Gate-to-Doc Cross-Reference Rule:** Every validation gate MUST be cross-referenced from `docs/validation.md` and from the documentation page that documents the validated capability (Gate 1 from `docs/usage.md` § Live Smoke Test, Gate 2 from `docs/troubleshooting.md`, Gate 8 from `docs/validation.md`, Gate 9 from `docs/architecture.md` § Component Reachability Matrix, Gate 10 from `docs/validation.md` § Single-Command Execution Path)
+- **Mermaid-Default Diagram Rule:** All architectural and data-flow diagrams MUST be authored in Mermaid; no PlantUML, no ASCII art, no binary image assets are introduced
+- **JSON Schema Draft Rule:** All JSON Schema files MUST declare `"$schema": "https://json-schema.org/draft/2020-12/schema"` and validate against that draft
+- **Citation Inline Rule:** All external citations (web research findings, API documentation URLs) MUST be inline in `docs/api-integrations.md`; no citations may live in a separate `references.md` or footnotes file
+- **Glossary Centralization Rule:** A single glossary section in `README.md` defines all package-specific terms (`facet`, `application`, `run`, `rubric`, `grade history`); no other document defines these terms
+- **No Redundancy Rule:** Each rule, each gate, each example MUST appear verbatim in exactly one canonical location (typically `template.md` for rules and gates; `examples/*` for examples) and MUST be referenced (not duplicated) from other locations
+- **CIO/CTO Audience Language Rule:** The Executive Summary content list, the matrix cell labels, and the rendered PDF mockup MUST use business-outcome language; technical jargon (CVSS, SBOM, CPE, NVD, OSV) MAY appear only inside the implementation-facing documentation pages (`docs/facets.md`, `docs/api-integrations.md`, `docs/grading-engine.md`)
+- **Minimal Change Mandate Rule:** No documentation file authors content beyond the user-defined four facets, grading engine, grade history, and PDF output; any future expansion is documented in `CHANGELOG.md` only after an explicit user request, never preemptively
+
+## 0.11 References
+
+### 0.11.1 Repository Files and Folders Examined
+
+The following files and folders in the repository were searched, retrieved, or summarized during the analysis that produced this Agent Action Plan. None of these files are modified by the planned work; all are in the strictly-out-of-scope set per sub-section 0.8.2.
+
+**Top-Level Files Examined:**
+
+- `README.md` (root) — verified as WealthLedger onboarding guide; not modified
+- `Package.swift` — verified as Swift Package Manager manifest for the 11-module WealthLedger project; not modified
+- `.swiftlint.yml` — verified as SwiftLint configuration; not modified
+- `.gitignore` — verified as git ignore patterns excluding Xcode build artifacts, SwiftPM caches, macOS metadata, and CSV files outside `Resources/`; not modified
+- `.swift-format` — verified present; not opened in detail; not modified
+
+**Top-Level Folders Examined:**
+
+- `Docs/` — confirmed contents (`architecture.md`, `database_schema.md`, `user_guide.md`); not modified
+- `Resources/Migrations/` — confirmed presence of 8 ordered SQL migration files; not opened in detail; not modified
+- `Scripts/` — confirmed presence of database bootstrap automation; not opened in detail; not modified
+- `Sources/` — confirmed presence of 11 Swift module subdirectories (AccountManagement, JobScheduler, LedgerEngine, Persistence, RBAC, ReferenceDataService, Shared, SeedTool, UILayer, ValuationEngine, WealthLedgerApp); not modified
+- `Tests/` — confirmed presence of integration and unit test suites; not modified
+- `WealthLedger.xcodeproj/` — confirmed presence; not opened; not modified
+- `blitzy/` — confirmed sole subfolder is `documentation/`; not modified
+- `blitzy/documentation/` — confirmed contents are `Project Guide.md` and `Technical Specifications.md`; not modified
+
+**Documentation Files Examined for Style Reference:**
+
+- `Docs/architecture.md` — read top-50 lines to confirm the WealthLedger architecture style for documentation prose convention; not modified
+- `blitzy/documentation/Technical Specifications.md` § 1.1, § 1.2, § 1.3, § 2.1 — retrieved via `get_tech_spec_section` to confirm the documentation style of numbered subsections, Mermaid diagrams, and tabular contracts that this template package mirrors; not modified
+
+**Folders Searched and Confirmed Absent:**
+
+- No `templates/` folder anywhere in the repository (search via `find` and `get_source_folder_contents` of root)
+- No `prompts/` folder anywhere in the repository
+- No `.blitzyignore` file anywhere on the filesystem (search via `find / -name ".blitzyignore"`)
+- No setup instruction files in `/tmp/environments_files/`
+- No prior PDF report artifacts in `Docs/`, `blitzy/documentation/`, or anywhere in the repository
+
+**Conclusion:** The repository inspection confirms that the new template package at `templates/technology-estate-report/` is greenfield. No existing file is modified, referenced (other than for style mirroring), or depended upon. The package is fully standalone.
+
+### 0.11.2 User-Provided Attachments
+
+**No file attachments were provided** by the user. The user prompt's instruction set explicitly states: "If the user mentioned any files in the instructions and provided them, you can find them in the folder '/tmp/environments_files'" and "No attachments found for this project." This was confirmed by listing `/tmp/environments_files/` which returned the message "No environment files."
+
+The user prompt itself is the sole input artifact and is treated as the canonical source for:
+
+- Role definition (§ 1)
+- Task context (§ 2)
+- Technical specifications including ingestion contract, facet analysis table, grading engine, grade persistence, executive summary content list, and output specification (§ 3)
+- Boundaries and preservation block (§ 4)
+- Rules R1–R10 (§ 5)
+- Validation framework — Gates 1, 2, 8, 9, 10 — and domain-specific success criteria (§ 6)
+
+All verbatim quotations from the user prompt that appear in this Agent Action Plan and that will appear in the authored `template.md` are sourced from these six sections.
+
+### 0.11.3 Figma URLs and Design Assets
+
+**No Figma URLs or design assets were provided.** This template package is documentation-only and does not implement any UI. The PDF output is described via:
+
+- A textual cell-rendering format specification (`docs/pdf-output.md`) preserving the user-supplied example `B  ←  prev: C  |  2025-10-01` verbatim
+- A Markdown mockup of the rendered PDF (`examples/sample-pdf-mockup.md`)
+- A Mermaid section-layout diagram (`docs/pdf-output.md` § Page Layout)
+
+No design system protocol applies because no UI components are introduced.
+
+### 0.11.4 External Web Sources Cited
+
+The following external web sources were consulted via web search to validate the API contracts, version specifications, and tooling references documented in the template package. Each source is cited inline at its point of use in `docs/api-integrations.md` and elsewhere; this section consolidates the source list for traceability.
+
+| Reference Domain | Source URL | Cited For |
+|---|---|---|
+| endoflife.date | `https://endoflife.date/docs/api/v1/` | API documentation site for the Maturity facet's EOL lookup; <cite index="3-1,3-2">An API is available for integration with CI platforms. API documentation is available at https://endoflife.date/docs/api/v1/.</cite> |
+| endoflife.date | `https://github.com/endoflife-date/endoflife.date` | API beta-status caveat <cite index="3-3">The API is currently in Beta, and breaking changes can happen.</cite> |
+| endoflife.date | `https://endoflife.date/` | Tracked-products count <cite index="5-8">endoflife.date currently tracks 454 products.</cite> |
+| NVD | `https://nvd.nist.gov/developers/vulnerabilities` | NVD CVE API v2.0 query semantics and pagination <cite index="11-13,11-14">Because of this, its APIs enforce offset-based pagination to answer requests for large collections. Through a series of smaller "chunked" responses controlled by an offset startIndex and a page limit resultsPerPage users may page through all the CVE in the NVD.</cite> |
+| NVD | `https://www.nist.gov/itl/nvd` | 429 status code change <cite index="15-5">As part of this transition, users will notice that requests being rate limited will now provide a status code of 429 instead of a status code of 403 "Forbidden by Administrative Rules".</cite> |
+| Phoenix Security | Web search result on NVD CVE API V2 | API rate limits with and without API key <cite index="14-27">a rate limit of 50 requests per 30-second window (for requests with API Key; without Key it's only 5 requests)</cite> |
+| Brinqa Documentation | `https://docs.brinqa.com/docs/connectors/nist-nvd/` | Confirmation of v2.0 as the Vulnerability API version <cite index="16-1">The NIST NVD connector uses the Product API v2.0 and Vulnerability API v2.0.</cite>; default service URL <cite index="16-31">The default URL is https://services.nvd.nist.gov.</cite> |
+| OSV | `https://osv.dev/` | OSV API query examples <cite index="21-7,21-8">An easy-to-use API is available to query for all known vulnerabilities by either a commit hash, or a package version.</cite> |
+| OSV | `https://google.github.io/osv.dev/api/` | API limits and HTTP/2 recommendation <cite index="25-9,25-10,25-11,25-12">Currently there are no limits on the API. The API has a response size limit of 32MiB when using HTTP/1.1. There is no limit when using HTTP/2. We recommend using HTTP/2 for queries that may result in large responses</cite> |
+| OSV blog | `https://osv.dev/blog/posts/api-latency-improvements-and-revised-slos/` | Endpoint latency comparisons <cite index="30-6">On average, the GET /v1/vulns/{id} endpoint is 5x faster, POST /v1/query is 2.5x faster, and POST /v1/querybatch is 3x faster.</cite> |
+| OSV | `https://github.com/google/osv.dev` | OSV-Scanner CycloneDX SBOM support <cite index="22-18">Currently it is able to scan various lockfiles, debian docker containers, SPDX and CycloneDB SBOMs, and git repositories.</cite> |
+| OWASP CycloneDX | `https://cyclonedx.org/` | CycloneDX BOM standard scope <cite index="34-1,34-2">OWASP CycloneDX is a full-stack Bill of Materials (BOM) standard that provides advanced supply chain capabilities for cyber risk reduction. The specification supports Software Bill of Materials (SBOM), Software-as-a-Service Bill of Materials (SaaSBOM), Hardware Bill of Materials (HBOM), Operations Bill of Materials (OBOM), Vulnerability Disclosure Reports (VDR), and Vulnerability Exploitability eXchange (VEX).</cite> |
+| cdxgen | `https://github.com/cdxgen/cdxgen` | Multi-language SBOM generator capability <cite index="39-40,39-41">Creates CycloneDX Bill of Materials (BOM) for your projects from source and container images. Supports many languages and package managers.</cite> |
+| sbomgenerator.com | `https://sbomgenerator.com/tools/cyclonedx-cli` | Per-ecosystem CycloneDX generator strategy <cite index="36-3,36-4">CycloneDX tooling is the right choice when you specifically need CycloneDX output and you care about validation, automation, and security-friendly downstream processing. The important detail is that the CycloneDX ecosystem is distributed across language-specific generators and plugins rather than one universal binary for every language.</cite> |
+
+### 0.11.5 Tech Spec Sections Retrieved
+
+The following sections of the existing WealthLedger Technical Specifications document were retrieved during context gathering to confirm the documentation-style baseline and to ensure the new template package does not conflict with or duplicate existing content. None are modified by this work.
+
+| Section Heading | Retrieved For | Outcome |
+|---|---|---|
+| `1.1 EXECUTIVE SUMMARY` | Establishing the documentation style baseline | Confirmed the WealthLedger application's identity; confirmed it has no overlap with the new template package |
+| `1.2 SYSTEM OVERVIEW` | Confirming there is no existing prompt-template feature in scope | Confirmed; new template package is greenfield |
+| `1.3 SCOPE` | Confirming explicit out-of-scope items in WealthLedger | Confirmed PDF output formats and runtime network calls are explicitly out of scope FOR WEALTHLEDGER (binding for that product); not binding for the new standalone template package which has its own boundaries section in `template.md` |
+| `2.1 FEATURE CATALOG` | Confirming there is no overlapping feature in WealthLedger | Confirmed; no WealthLedger feature overlaps with the new template package |
+
+### 0.11.6 User-Specified Implementation Rules
+
+**No additional implementation rules** were supplied beyond those in the user's prompt sections 1–6. The "User specified implementation rules for this project" field in the section instructions was empty (`[]`).
+
+The user-specified rules R1–R10 from the prompt's section 5 are the canonical rule set and are operationalized per sub-section 0.10.1 above.
 
