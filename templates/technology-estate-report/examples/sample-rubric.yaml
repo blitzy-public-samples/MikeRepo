@@ -1,0 +1,161 @@
+# ===========================================================================
+# Technology Estate Report — Production-Ready Example Rubric
+# Package: technology-estate-report v0.1.0
+#
+# File: examples/sample-rubric.yaml
+# Purpose: Full-coverage A–F rubric demonstrating production-ready criteria
+#          across all four canonical facets, suitable for adoption as a
+#          starting template for organizational rubric authoring. This file
+#          is the PRODUCTION-READY example (vs. the minimal CONFIG-style
+#          example at ../config/rubric-example.yaml).
+#
+# Operationalizes:
+#   • Rule R1 (rubric editability) — demonstrates the user-authored,
+#     generation-time rubric input format. No grade thresholds are hardcoded
+#     in the template; the criteria below are illustrative production
+#     thresholds intended for customization. Per Rule R1, generating a
+#     report with two different rubric inputs for the same dataset MUST
+#     produce two different grade outputs — see ../docs/grading-engine.md
+#     for the R1 verification procedure.
+#   • Rule R5 (Complexity placeholder integrity) — the `complexity: []`
+#     empty array is the canonical v0.1.0 default state. Per Rule R5, the
+#     Complexity column is locked to "Grade: TBD — definition pending"
+#     until the user supplies explicit thresholds. The column MUST NOT be
+#     removed, collapsed, or backfilled with an inferred grade. Authoring
+#     any Complexity entry in this file — even illustrative — would conflict
+#     with Rule R5's "MUST NOT be ... backfilled" mandate, so this file
+#     deliberately keeps `complexity: []`.
+#
+# Verbatim user-supplied example preserved in the `maturity` rubric below:
+#   "No library out of support = A for Maturity"
+# The antecedent "No library out of support" is encoded as the `criteria`
+# field of the maturity grade-A entry; the grade assignment "= A for
+# Maturity" is encoded structurally by placement under `maturity` and the
+# `grade: A` key. See AAP § 0.10.2 (Verbatim Preservation Rule).
+#
+# Schema conformance: This file MUST validate against
+#   ../schemas/rubric.schema.json
+# (JSON Schema Draft 2020-12, $id urn:blitzy:technology-estate-report:rubric:v0.1.0).
+# The grade enum is exactly {A, B, C, D, F}; special downstream values
+# (TBD, N/A, Insufficient Data) are emitted by the grading engine, the
+# grade-history persistence layer, and the PDF renderer based on
+# data-availability conditions and the Rule R5 Complexity-lock — they are
+# NEVER supplied by the rubric author and do NOT appear in this file.
+#
+# Companion files:
+#   • ../config/rubric-example.yaml — minimal CONFIG-style example
+#   • ../schemas/rubric.schema.json — validation contract (Draft 2020-12)
+#   • ../docs/grading-engine.md     — rubric format reference & authoring guide
+#   • ../docs/usage.md              — end-to-end author workflow (§ 5)
+#   • ../docs/configuration.md      — modification cadence guidance (§ 7)
+#   • ../docs/facets.md             — per-facet detection rules referenced
+#                                     by the criteria text below
+#
+# Usage:
+#   1. Copy this file to a path under the report author's control
+#      (e.g., ~/rubrics/portfolio-rubric.yaml).
+#   2. Customize the `criteria` text per the organization's grading
+#      standards. The criteria below are illustrative production-ready
+#      thresholds; a real report author tailors them to their organization's
+#      actual technology standards.
+#   3. (OPTIONAL — Rule R5 unlocking) To define Complexity thresholds,
+#      replace `complexity: []` with a non-empty array following the same
+#      entry shape as the other facets. See ../docs/grading-engine.md
+#      § 5.2 Unlocked State for the procedure. NOTE: Adding Complexity
+#      entries is a future-state customization and is NOT recommended for
+#      v0.1.0 default usage; the locked state is the canonical initial
+#      state per Rule R5.
+#   4. Supply the resulting YAML to the template at run-time per
+#      ../docs/usage.md § 5 (author workflow).
+# ===========================================================================
+---
+rubric:
+
+  # -------------------------------------------------------------------------
+  # Tech Stack Summary facet rubric
+  # -------------------------------------------------------------------------
+  # See ../docs/facets.md#tech-stack-summary for the language % share by
+  # file count, cloud provider identification (Terraform AWS/Azure/GCP,
+  # Helm, CloudFormation), and vendor/framework extraction rules per
+  # dependency manifest format. The criteria text below is illustrative
+  # production-ready threshold prose authored at generation time per
+  # Rule R1; customize per the organization's strategic technology
+  # standards before invoking the template.
+  tech_stack:
+    - grade: A
+      criteria: "Modern, actively-supported tech stack on a single primary cloud; vendor and framework choices are well-known industry standards with active community support; >85% of source files in primary supported languages."
+      notes: "Tech Stack facet — see ../docs/facets.md#tech-stack-summary for the language %, cloud, and vendor/framework detection rules. Per Rule R1, the criteria text is user-authored at generation time; thresholds are not hardcoded in the template. Author the criteria to match the organization's strategic technology standards."
+    - grade: B
+      criteria: "Mostly modern tech stack with at most one legacy component (e.g., one legacy language used in a small share of the codebase, or one secondary cloud); vendor and framework choices are mainstream; >70% of source files in primary supported languages."
+    - grade: C
+      criteria: "Mixed tech stack with multiple legacy components OR multiple primary clouds; vendor/framework choices include at least one niche or low-community-support technology; 50–70% of source files in primary supported languages."
+    - grade: D
+      criteria: "Predominantly legacy tech stack OR fragmented across several primary clouds; vendor/framework choices include multiple niche technologies with limited community support; <50% of source files in primary supported languages."
+    - grade: F
+      criteria: "Deprecated language(s) or framework(s) with no active community; cloud platform end-of-support; absence of mainstream framework choices; technical platform is unsupportable without major investment."
+
+  # -------------------------------------------------------------------------
+  # Maturity Summary facet rubric
+  # -------------------------------------------------------------------------
+  # CRITICAL: The grade-A entry below preserves the verbatim user-supplied
+  # example "No library out of support = A for Maturity" — the antecedent
+  # "No library out of support" is the criteria text, and the grade
+  # assignment "= A for Maturity" is encoded structurally by placement
+  # under `maturity` and the `grade: A` key. See AAP § 0.10.2 (Verbatim
+  # Preservation Rule). The remaining entries (B–F) define increasingly
+  # lenient EOL-density thresholds against endoflife.date lookups per
+  # ../docs/facets.md#maturity-summary.
+  maturity:
+    - grade: A
+      criteria: "No library out of support"
+      notes: "Maturity facet grade A — verbatim user-supplied example from the user prompt § 3 Grading Engine: 'No library out of support = A for Maturity'. Per Rule R1, the criteria text is user-authored at generation time; the grading engine evaluates the manifest-derived EOL status (per ../docs/facets.md#maturity-summary) against this criteria."
+    - grade: B
+      criteria: "Up to 10% of tracked dependencies are out of support per endoflife.date; no critical runtime is past EOL."
+    - grade: C
+      criteria: "Between 10% and 25% of tracked dependencies are out of support per endoflife.date; or one critical runtime is within 6 months of EOL."
+    - grade: D
+      criteria: "Between 25% and 50% of tracked dependencies are out of support per endoflife.date; or one critical runtime is past EOL."
+    - grade: F
+      criteria: "Majority of tracked dependencies are past EOL per endoflife.date (more than 50%); or multiple critical runtimes are past EOL."
+
+  # -------------------------------------------------------------------------
+  # Security Summary facet rubric
+  # -------------------------------------------------------------------------
+  # Criteria reference the four CVE severity tiers (Critical, High, Medium,
+  # Low) per Rule R4. The canonical CVSS-to-severity-tier mapping lives in
+  # ../config/facets.yaml severity_tier_mapping; this rubric uses the tier
+  # names directly without re-encoding the CVSS thresholds. Per Rule R9,
+  # every CVE count below is sourced from a scan with a recorded ISO 8601
+  # timestamp and source database label (NVD, OSV, or both) — see
+  # ../docs/api-integrations.md and ../docs/facets.md#security-summary.
+  security:
+    - grade: A
+      criteria: "Zero Critical CVEs and zero High CVEs across all tracked dependencies."
+      notes: "Security facet — see ../docs/facets.md#security-summary. The criteria reference the four severity tiers (Critical, High, Medium, Low) per Rule R4; the canonical CVSS-to-tier mapping lives in ../config/facets.yaml severity_tier_mapping. Per Rule R9, every CVE count is sourced from a scan with a recorded timestamp and source database label (NVD, OSV, or both)."
+    - grade: B
+      criteria: "Zero Critical CVEs and at most 5 High CVEs total across all tracked dependencies."
+    - grade: C
+      criteria: "At most 1 Critical CVE OR at most 15 High CVEs total."
+    - grade: D
+      criteria: "At most 5 Critical CVEs OR more than 15 High CVEs total."
+    - grade: F
+      criteria: "More than 5 Critical CVEs total."
+
+  # -------------------------------------------------------------------------
+  # Complexity Summary facet rubric — CRITICAL: empty array per Rule R5
+  # -------------------------------------------------------------------------
+  # Per Rule R5 (Complexity placeholder integrity), the `complexity` rubric
+  # is intentionally an empty array in this v0.1.0 production-ready
+  # example. While empty, the grading engine emits `TBD` as the Complexity
+  # grade per ../docs/grading-engine.md § 5, and the PDF renderer renders
+  # the placeholder label "Grade: TBD — definition pending" alongside the
+  # raw proxy metrics (LOC, file count, contributor count) per
+  # ../docs/facets.md § Complexity Summary and ../docs/pdf-output.md § 5.4.
+  # The column MUST NOT be removed, collapsed, or backfilled with an
+  # inferred grade until an explicit rubric is provided by the user.
+  # Authoring any Complexity entry in THIS example file — even illustrative
+  # — would conflict with Rule R5's "MUST NOT be ... backfilled" mandate.
+  # To unlock the Complexity facet in your own copy of this rubric, see
+  # ../docs/grading-engine.md § 5.2 Unlocked State for the documented
+  # procedure (NOT recommended for v0.1.0 default usage).
+  complexity: []
