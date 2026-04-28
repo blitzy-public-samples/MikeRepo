@@ -1,0 +1,332 @@
+# ---------------------------------------------------------------------------
+# Technology Estate Report — Per-Facet Configuration
+# Package: technology-estate-report v0.1.0
+#
+# Operationalizes:
+#   - Rule R2 (facet completeness): every facet enabled; insufficient_data_conditions
+#     enumerated per facet
+#   - Rule R4 (CVE severity breakdown): canonical CVSS-to-severity tier mapping
+#   - Rule R5 (Complexity placeholder integrity): placeholder_label "Grade: TBD —
+#     definition pending" preserved verbatim with em-dash U+2014
+#
+# This file is the SINGLE SOURCE OF TRUTH for per-facet feature flags, severity
+# thresholds, "Insufficient Data" conditions, and rendering literals consumed by
+# the PDF renderer. No other file in the package duplicates the CVSS-to-severity
+# mapping or the cell-rendering literals — both are read from this document.
+#
+# Documented in: ../docs/configuration.md
+# Canonical rule text: ../template.md § 5 Rules
+# Companion files in this folder: rubric-example.yaml, allow-list.yaml
+# ---------------------------------------------------------------------------
+---
+version: "0.1.0"
+
+description: >-
+  Canonical per-facet configuration for the Technology Estate Report Blitzy
+  prompt template package. Encodes per-facet feature flags, the canonical
+  CVSS v3.1 base-score-to-severity-tier mapping (Rule R4), the "Insufficient
+  Data" threshold conditions per facet (Rule R2 / Gate 2), the Complexity
+  placeholder configuration (Rule R5), and the default cell-rendering
+  literals consumed by the PDF renderer. Documented in
+  ../docs/configuration.md; rule text in ../template.md § 5 Rules.
+
+# ---------------------------------------------------------------------------
+# facets — per-facet feature flags and detection configuration
+#
+# Per Rule R2 (facet completeness), all four facets are enabled in v0.1.0;
+# disabling a facet would violate the rule that all four columns are present
+# in every matrix row in every report run. Entries appear in the canonical
+# column order: tech_stack (1), maturity (2), security (3), complexity (4),
+# matching the user prompt § 3 Output specification.
+# ---------------------------------------------------------------------------
+facets:
+
+  # -------------------------------------------------------------------------
+  # Tech Stack Summary facet (column 1)
+  # -------------------------------------------------------------------------
+  tech_stack:
+    enabled: true
+    display_name: "Tech Stack Summary"
+    column_order: 1
+    data_sources:
+      - source_files
+      - dependency_manifests
+      - iac_configs
+    # Per Rule R2 / Gate 2, each condition below maps to the cell value
+    # "Insufficient Data" rather than a silent omission. See
+    # ../docs/troubleshooting.md § Failure-Mode-to-Cell-Value Mapping.
+    insufficient_data_conditions:
+      - "No source files detected"
+      - "No dependency manifests detected"
+      - "All three sub-detectors (language, cloud, vendor/framework) failed"
+    documentation: ../docs/facets.md#tech-stack-summary
+    # Language detection: file-extension-to-language map with % share by
+    # file count, per AAP § 0.5.2.
+    language_detection:
+      metric: file_count_share
+      min_file_count: 1
+      description: >-
+        Detect languages by file extension and report % share by file count.
+        The detector consumes the file-extension-to-language map documented
+        in ../docs/facets.md § Tech Stack Summary § Language Detection.
+    # Cloud provider identification: IaC resource-type prefix mapping and
+    # Helm chart annotation parsing, per AAP § 0.5.2.
+    cloud_provider_detection:
+      iac_resource_type_namespaces:
+        aws:
+          - "aws_*"
+          - "AWS::*"
+        azure:
+          - "azurerm_*"
+          - "azapi_*"
+          - "Microsoft.*"
+        gcp:
+          - "google_*"
+      helm_chart_annotations:
+        - "app.kubernetes.io/cloud"
+        - "cloud.provider"
+      description: >-
+        Identify cloud providers by IaC resource type prefix and Helm chart
+        annotations. See ../docs/facets.md § Tech Stack Summary § Cloud
+        Provider Identification.
+
+  # -------------------------------------------------------------------------
+  # Maturity Summary facet (column 2)
+  # -------------------------------------------------------------------------
+  maturity:
+    enabled: true
+    display_name: "Maturity Summary"
+    column_order: 2
+    data_sources:
+      - dependency_manifests
+      - runtime_declarations
+    insufficient_data_conditions:
+      - "No dependency manifests or runtime declarations detected"
+      - "endoflife.date does not track any of the detected products (no slug resolution)"
+      - "endoflife.date API persistently unreachable after retries (per Gate 2, surface as Insufficient Data)"
+    documentation: ../docs/facets.md#maturity-summary
+    # endoflife.date /api/v1/products/{product}/ EOL lookup. The API contract
+    # (base URL, no auth, beta-status caveat) lives in ../docs/api-integrations.md.
+    eol_lookup:
+      provider: endoflife.date
+      api_version: v1
+      slug_resolution_table_documentation: ../docs/facets.md#maturity-summary-product-slug-resolution
+      description: >-
+        Look up library and runtime EOL status via endoflife.date
+        /api/v1/products/{product}/. The product slug resolution table
+        is documented in ../docs/facets.md.
+    # Technical debt score consumed by the Maturity rubric per Rule R1.
+    # The score is a fraction in [0.0, 1.0]; the user-supplied rubric
+    # defines the score-to-grade thresholds at generation time.
+    technical_debt_score:
+      formula: "out_of_support_dependencies / total_tracked_dependencies"
+      range: [0.0, 1.0]
+      description: >-
+        Technical debt score computed as the fraction of dependencies past
+        EOL per endoflife.date. The score is consumed by the rubric to
+        derive the A-F maturity grade per Rule R1; the user-supplied rubric
+        defines the score-to-grade thresholds at generation time.
+
+  # -------------------------------------------------------------------------
+  # Security Summary facet (column 3)
+  # -------------------------------------------------------------------------
+  security:
+    enabled: true
+    display_name: "Security Summary"
+    column_order: 3
+    data_sources:
+      - dependency_manifests
+    insufficient_data_conditions:
+      - "SBOM generation failed for all detected ecosystems"
+      - "Both NVD and OSV CVE databases persistently unreachable after retries"
+      - "No dependency manifests detected"
+    documentation: ../docs/facets.md#security-summary
+    # SBOM generation: per-ecosystem CycloneDX SBOMs. Per-ecosystem generator
+    # selection table is in ../docs/api-integrations.md § SBOM Generation.
+    sbom_generation:
+      format: cyclonedx
+      description: >-
+        Generate per-ecosystem CycloneDX SBOMs using the per-ecosystem
+        generators enumerated in ../docs/api-integrations.md § SBOM
+        Generation. The CycloneDX BOM standard is the package-of-record
+        vendor-neutral format.
+    # CVE lookup: NVD CVE API v2.0 (primary) + OSV API v1 (secondary, for
+    # cross-reference). Records are deduplicated by CVE-YYYY-NNNNN id; on
+    # conflict the NVD CVSS score is preferred per
+    # ../docs/facets.md § Security Summary § Deduplication.
+    # Per Rule R9, every result records scan_timestamp (ISO 8601) and
+    # source_database_label (NVD, OSV, or both).
+    cve_lookup:
+      primary_source: NVD
+      secondary_source: OSV
+      dedup_strategy: by_cve_id
+      attribution_required: true
+      description: >-
+        Look up CVEs via NVD CVE API v2.0 and OSV API v1, deduplicate by
+        CVE id, and record per-result scan_metadata per Rule R9. See
+        ../docs/api-integrations.md § NVD CVE API v2.0 and § OSV API v1
+        for rate-limit semantics and retry rules.
+    # Severity tier counting per Rule R4: four named tiers plus total.
+    # The CVSS-to-tier mapping is in `severity_tier_mapping` below.
+    severity_tier_counting:
+      tiers: [Critical, High, Medium, Low]
+      total_required: true
+      description: >-
+        Per Rule R4, the Security cell MUST report CVE counts broken out
+        by the four severity tiers plus a total. A single aggregate number
+        without severity tiers is a failing state. The CVSS-to-tier
+        mapping is in `severity_tier_mapping` below.
+
+  # -------------------------------------------------------------------------
+  # Complexity Summary facet (column 4) — locked to TBD per Rule R5
+  # -------------------------------------------------------------------------
+  # Per Rule R5 (Complexity placeholder integrity), the column MUST be
+  # present and MUST render raw proxy metrics (LOC, file count, contributor
+  # count) with the placeholder label "Grade: TBD — definition pending".
+  # The column MUST NOT be removed, collapsed, or backfilled with an
+  # inferred grade until an explicit rubric is provided by the user.
+  complexity:
+    enabled: true
+    display_name: "Complexity Summary"
+    column_order: 4
+    data_sources:
+      - source_files
+      - git_history
+    insufficient_data_conditions:
+      - "No source files detected"
+      - "git history unavailable (e.g., shallow clone or fetch failure)"
+    documentation: ../docs/facets.md#complexity-summary
+    # PRESERVE VERBATIM: em-dash is U+2014 (UTF-8 0xE2 0x80 0x94), not a
+    # hyphen-minus and not an en-dash. This literal is byte-for-byte
+    # identical to rendering_defaults.tbd_placeholder_label below.
+    placeholder_label: "Grade: TBD — definition pending"
+    # Per Rule R5: the placeholder remains in effect until an explicit
+    # rubric is provided by the user. v0.1.0 ships with this lock engaged.
+    placeholder_locked_until_rubric_supplied: true
+    # Per Rule R5: raw proxy metrics rendered alongside the placeholder
+    # label — LOC, file count, contributor count.
+    raw_proxy_metrics:
+      loc:
+        metric: lines_of_code
+        description: "Total lines of code across all detected source files. Counts non-blank, non-comment lines."
+      file_count:
+        metric: file_count
+        description: "Total count of source files."
+      contributor_count:
+        metric: distinct_contributors
+        description: "Distinct contributor count derived from git history."
+    complexity_lock_description: >-
+      Per Rule R5: The Complexity column MUST be present and MUST render
+      raw proxy metrics (LOC, file count, contributor count) with the
+      label 'Grade: TBD — definition pending.' The column MUST NOT be
+      removed, collapsed, or backfilled with an inferred grade until an
+      explicit rubric is provided by the user.
+
+# ---------------------------------------------------------------------------
+# severity_tier_mapping — canonical CVSS v3.1 base-score-to-tier table
+#
+# Per Rule R4, the Security Summary cell reports CVE counts broken out by
+# four severity tiers (Critical, High, Medium, Low) plus a total count.
+# This object is the SINGLE SOURCE OF TRUTH for the CVSS-to-severity
+# translation; ../docs/facets.md and ../schemas/report-output.schema.json
+# reference this table rather than duplicating it.
+# ---------------------------------------------------------------------------
+severity_tier_mapping:
+  # CVSS version is quoted as a string to prevent YAML interpretation as a float.
+  cvss_version: "3.1"
+  description: >-
+    Per Rule R4, the Security Summary cell MUST report CVE counts broken
+    out by severity tier (Critical, High, Medium, Low) plus a total count.
+    This object encodes the canonical CVSS v3.1 base-score-to-tier mapping
+    consumed by the CVE scanner. See ../docs/facets.md § Security Summary
+    § CVSS-to-Severity Mapping for the rendering diagram.
+  # Tiers appear in highest-severity-first order (Critical → High → Medium → Low).
+  tiers:
+    - name: Critical
+      min: 9.0
+      max: 10.0
+      description: "CVSS v3.1 base score in [9.0, 10.0]."
+    - name: High
+      min: 7.0
+      max: 8.9
+      description: "CVSS v3.1 base score in [7.0, 8.9]."
+    - name: Medium
+      min: 4.0
+      max: 6.9
+      description: "CVSS v3.1 base score in [4.0, 6.9]."
+    - name: Low
+      min: 0.1
+      max: 3.9
+      description: "CVSS v3.1 base score in [0.1, 3.9]."
+  # Per Rule R2 and Gate 2, an unscored CVE record is not silently dropped;
+  # it is recorded in an "unscored" bucket and surfaces as Insufficient Data
+  # if it is the only available signal for the facet.
+  none_handling:
+    condition: "CVE record has no CVSS v3.1 base score"
+    outcome: insufficient_data
+    description: >-
+      Per Rule R2 and Gate 2, a CVE record without a CVSS v3.1 base score
+      is not silently dropped; it is recorded under an 'unscored' bucket
+      and surfaces as Insufficient Data if it is the only available signal
+      for the facet.
+
+# ---------------------------------------------------------------------------
+# rendering_defaults — single source of truth for cell-rendering literals
+#
+# Per Rule R3, the cell-rendering format is the verbatim literal
+# "B  ←  prev: C  |  2025-10-01" (with two spaces around the arrow and the
+# pipe). The PDF renderer reads these literals from this file rather than
+# embedding them in code, ensuring the rules R2, R3, and R5 cell values are
+# emitted byte-for-byte consistently across every report run.
+# ---------------------------------------------------------------------------
+rendering_defaults:
+  # PRESERVE VERBATIM per Rule R3 example "B  ←  prev: C  |  2025-10-01":
+  # two spaces around the arrow ←, two spaces around the pipe |.
+  cell_format: "{current_grade}  ←  prev: {prior_grade}  |  {prior_run_date}"
+  # Per Rule R3: when no prior run exists for an (application, facet) pair,
+  # render `N/A` and omit the date segment.
+  cell_format_first_run: "{current_grade}  ←  prev: N/A"
+  # Per Rule R2: failed-data-source cells render "Insufficient Data" with
+  # capital I and capital D and a single space between the words.
+  insufficient_data_value: "Insufficient Data"
+  # Per Rule R3: capital N, slash, capital A.
+  na_value: "N/A"
+  # Per Rule R5: PRESERVE VERBATIM with em-dash U+2014. Byte-for-byte
+  # identical to facets.complexity.placeholder_label above.
+  tbd_placeholder_label: "Grade: TBD — definition pending"
+  # U+2190 LEFTWARDS ARROW (UTF-8 0xE2 0x86 0x90).
+  arrow_glyph: "←"
+  # ASCII pipe (U+007C).
+  pipe_glyph: "|"
+  # U+2014 EM DASH (UTF-8 0xE2 0x80 0x94) used in tbd_placeholder_label.
+  em_dash_glyph: "—"
+  # Per Rules R3 and R9: ISO 8601 date format used in the cell-rendering
+  # format and in scan_metadata timestamps.
+  iso_8601_date_format: "YYYY-MM-DD"
+  description: >-
+    Per Rule R3, the cell-rendering format is the verbatim literal
+    "B  ←  prev: C  |  2025-10-01" (with two spaces around the arrow and
+    the pipe). Per Rule R2, failed-data-source cells render the literal
+    "Insufficient Data". Per Rule R5, the Complexity cell renders the
+    literal placeholder "Grade: TBD — definition pending". The PDF
+    renderer in ../docs/pdf-output.md reads these literals from this
+    file as the single source of truth.
+
+# ---------------------------------------------------------------------------
+# references — relative-path links to documentation that consumes this file
+#
+# Every link is a relative path from this file's location (templates/
+# technology-estate-report/config/) and resolves within the package per the
+# AAP § 0.10.2 "Standalone Package Rule". No link reaches outside the
+# package; no external URL appears in this file.
+# ---------------------------------------------------------------------------
+references:
+  documentation: ../docs/configuration.md
+  facets_documentation: ../docs/facets.md
+  pdf_output_documentation: ../docs/pdf-output.md
+  troubleshooting: ../docs/troubleshooting.md
+  api_integrations: ../docs/api-integrations.md
+  template_entry_point: ../template.md
+  rule_r2_canonical_text: ../template.md#5-rules
+  rule_r4_canonical_text: ../template.md#5-rules
+  rule_r5_canonical_text: ../template.md#5-rules
