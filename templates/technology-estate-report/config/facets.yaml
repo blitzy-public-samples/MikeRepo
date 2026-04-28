@@ -118,7 +118,7 @@ facets:
     eol_lookup:
       provider: endoflife.date
       api_version: v1
-      slug_resolution_table_documentation: ../docs/facets.md#maturity-summary-product-slug-resolution
+      slug_resolution_table_documentation: ../docs/facets.md#product-slug-resolution
       description: >-
         Look up library and runtime EOL status via endoflife.date
         /api/v1/products/{product}/. The product slug resolution table
